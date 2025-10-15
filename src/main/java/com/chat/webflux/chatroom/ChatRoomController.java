@@ -1,0 +1,77 @@
+package com.chat.webflux.chatroom;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import com.chat.webflux.user.User;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/chatrooms")
+@RequiredArgsConstructor
+public class ChatRoomController {
+
+    private final ChatRoomService chatRoomService;
+    private final ObjectMapper objectMapper;
+
+    @GetMapping(value = "/{username}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> getChatRoomStream(@PathVariable String username) {
+        return chatRoomService.getChatRoomUpdates(username)
+                .flatMap(this::convertListToJson);
+    }
+
+    @Getter
+    @Setter
+    private static class CreateRoomRequest {
+        private String name;
+        private String username;
+    }
+
+    @PostMapping
+    public Mono<ChatRoom> createChatRoom(@RequestBody CreateRoomRequest request) {
+        return chatRoomService.createChatRoom(request.getName(), request.getUsername());
+    }
+
+    @Getter
+    @Setter
+    private static class InviteRequest {
+        private String usernameToInvite;
+        private String invitedBy;
+    }
+
+    @PostMapping("/{roomId}/invite")
+    public Mono<ChatRoom> inviteUser(@PathVariable String roomId, @RequestBody InviteRequest request) {
+        return chatRoomService.inviteUserToChatRoom(roomId, request.getUsernameToInvite(), request.getInvitedBy());
+    }
+
+    @Getter
+    @Setter
+    private static class LeaveRequest {
+        private String username;
+    }
+
+    @GetMapping("/{roomId}/members")
+    public Flux<User> getRoomMembers(@PathVariable String roomId) {
+        return chatRoomService.getChatRoomMembers(roomId);
+    }
+
+    @PostMapping("/{roomId}/leave")
+    public Mono<Void> leaveRoom(@PathVariable String roomId, @RequestBody LeaveRequest request) {
+        return chatRoomService.leaveChatRoom(roomId, request.getUsername());
+    }
+
+    private Mono<String> convertListToJson(List<ChatRoom> list) {
+        try {
+            return Mono.just(objectMapper.writeValueAsString(list));
+        } catch (JsonProcessingException e) {
+            return Mono.error(e);
+        }
+    }
+}
