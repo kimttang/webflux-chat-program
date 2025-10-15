@@ -1,4 +1,7 @@
 let lastMessageInfo = {sender: null, timestamp: null};
+let searchResults = [];
+let currentSearchIndex = -1;
+
 const DOM = {
     authScreen: document.getElementById('auth-screen'),
     loginForm: document.getElementById('login-form'),
@@ -61,6 +64,13 @@ const DOM = {
     replyToUser: document.getElementById('reply-to-user'),
     replyToMessage: document.getElementById('reply-to-message'),
     cancelReplyButton: document.getElementById('cancel-reply-button'),
+    searchNav: document.getElementById('search-nav'),
+    searchCount: document.getElementById('search-count'),
+    searchPrevButton: document.getElementById('search-prev-button'),
+    searchNextButton: document.getElementById('search-next-button'),
+    searchIcon: document.getElementById('search-icon'),
+    searchInput: document.getElementById('search-input'),
+    searchBar: document.getElementById('search-bar'),
 };
     const translations = {
     // --- 로그인/회원가입 화면 번역 추가 ---
@@ -1078,4 +1088,94 @@ function toggleSavedTranslation(messageId, msg) {
 
     // 6. 마지막으로 메뉴를 닫아줍니다.
     toggleOptionsMenu(messageId);
+}
+DOM.searchIcon.onclick = () => {
+
+    DOM.searchBar.classList.toggle('hidden');
+
+    if (!DOM.searchBar.classList.contains('hidden')) {
+        DOM.searchInput.focus();
+    } else {
+        clearSearch();
+    }
+};
+
+DOM.searchInput.addEventListener('keyup', (event) => {
+    if (event.key === 'Enter') {
+        const keyword = DOM.searchInput.value.trim();
+        if (keyword) {
+            searchMessages(keyword);
+        } else {
+            clearSearch();
+        }
+    }
+});
+
+DOM.searchNextButton.onclick = () => navigateSearchResults(-1); // 아래로(이전 메시지)
+DOM.searchPrevButton.onclick = () => navigateSearchResults(1);  // 위로(다음 메시지)
+
+
+// 검색 기능을 처리하는 새로운 함수들
+
+// 검색을 초기화하는 함수
+function clearSearch() {
+    searchResults = [];
+    currentSearchIndex = -1;
+    DOM.searchNav.classList.add('hidden');
+    // 모든 하이라이트 제거
+    document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+}
+
+// 백엔드에 검색을 요청하고 결과를 저장하는 함수
+async function searchMessages(keyword) {
+    try {
+        const response = await fetch(`/api/rooms/${currentRoomId}/messages/search?keyword=${keyword}`);
+        if (!response.ok) throw new Error('검색 실패');
+
+        searchResults = await response.json();
+
+        if (searchResults.length > 0) {
+            currentSearchIndex = 0; // 첫 번째 결과부터 시작
+            DOM.searchNav.classList.remove('hidden');
+            navigateSearchResults(0); // 첫 번째 결과로 이동
+        } else {
+            DOM.searchNav.classList.remove('hidden');
+            DOM.searchCount.textContent = "0 / 0";
+            alert('검색 결과가 없습니다.');
+        }
+    } catch (error) {
+        console.error('검색 중 오류 발생:', error);
+    }
+}
+
+// 검색 결과 사이를 이동하는 함수
+function navigateSearchResults(direction) {
+    if (searchResults.length === 0) return;
+
+    // 현재 하이라이트 제거
+    const currentMessageId = searchResults[currentSearchIndex]?.id;
+    if (currentMessageId) {
+        document.getElementById(`message-${currentMessageId}`)?.classList.remove('highlight');
+    }
+
+    currentSearchIndex += direction;
+
+    // 인덱스 순환
+    if (currentSearchIndex < 0) currentSearchIndex = searchResults.length - 1;
+    if (currentSearchIndex >= searchResults.length) currentSearchIndex = 0;
+
+    const messageId = searchResults[currentSearchIndex].id;
+    scrollToMessage(messageId);
+
+    // 카운트 업데이트
+    DOM.searchCount.textContent = `${currentSearchIndex + 1} / ${searchResults.length}`;
+}
+
+// 특정 메시지로 스크롤하고 하이라이트하는 함수
+function scrollToMessage(messageId) {
+    const messageElement = document.getElementById(`message-${messageId}`);
+    if (messageElement) {
+        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        messageElement.classList.add('highlight');
+    }
 }

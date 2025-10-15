@@ -2,20 +2,17 @@ package com.chat.webflux.message;
 
 import com.chat.webflux.chatroom.ChatRoomRepository;
 import com.chat.webflux.dto.ChatMessageDto;
+import com.chat.webflux.user.User;
 import com.chat.webflux.user.UserRepository;
+import com.chat.webflux.user.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import java.util.List; // List import 추가
-import java.util.Map;   // Map import 추가
-import java.util.function.Function; // Function import 추가
-import java.util.stream.Collectors; // Collectors import 추가
-import com.chat.webflux.user.User;
+
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 @RestController
 @RequestMapping("/api/rooms")
 @RequiredArgsConstructor
@@ -23,6 +20,7 @@ public class ChatMessageController {
 
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
+    private final UserService userService;
     private final ChatRoomRepository chatRoomRepository;
 
     @GetMapping("/{roomId}/messages")
@@ -89,5 +87,17 @@ public class ChatMessageController {
                                         });
                             });
                 });
+    }
+    @GetMapping("/{roomId}/messages/search")
+    public Flux<ChatMessageDto> searchMessages(
+            @PathVariable String roomId,
+            @RequestParam String keyword) {
+
+        return chatMessageRepository.findByRoomIdAndSearchKeyword(roomId, keyword)
+                .flatMap(message ->
+                        userService.findByUsername(message.getSender())
+                                .map(user -> new ChatMessageDto(message, user))
+                                .defaultIfEmpty(new ChatMessageDto(message, message.getSender()))
+                );
     }
 }

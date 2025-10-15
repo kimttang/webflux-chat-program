@@ -65,6 +65,18 @@
         <div class="header">
             <button id="back-to-main" class="back-button">←</button>
             <h2 id="chat-title" class="chat-title"></h2>
+
+            <span id="search-icon">🔍</span>
+        </div>
+
+        <div id="search-bar" class="search-bar hidden">
+            <input type="text" id="search-input" placeholder="메시지 검색...">
+
+            <span id="search-nav">
+        <span id="search-count">0 / 0</span>
+        <button id="search-prev-button">🔼</button>
+        <button id="search-next-button">🔽</button>
+    </span>
         </div>
         <div id="chat-window" class="chat-window"></div>
         <div id="typing-indicator" class="typing-indicator"></div>

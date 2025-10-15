@@ -1,12 +1,7 @@
 package com.chat.webflux.handler;
 
 import com.chat.webflux.chatroom.ChatRoomRepository;
-import com.chat.webflux.dto.ChatMessageDto;
-import com.chat.webflux.dto.IncomingMessage;
-import com.chat.webflux.dto.OllamaMessage;
-import com.chat.webflux.dto.OllamaRequest;
-import com.chat.webflux.dto.OllamaResponse;
-import com.chat.webflux.dto.OutgoingMessage;
+import com.chat.webflux.dto.*;
 import com.chat.webflux.message.ChatMessage;
 import com.chat.webflux.message.ChatMessageRepository;
 import com.chat.webflux.presence.PresenceService;
@@ -19,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.socket.WebSocketHandler;
-import org.springframework.web.reactive.socket.WebSocketMessage;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;

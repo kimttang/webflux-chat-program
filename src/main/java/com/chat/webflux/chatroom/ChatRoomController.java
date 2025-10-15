@@ -1,5 +1,6 @@
 package com.chat.webflux.chatroom;
 
+import com.chat.webflux.user.User;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
@@ -9,7 +10,6 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import com.chat.webflux.user.User;
 
 import java.util.List;
 
