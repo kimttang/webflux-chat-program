@@ -441,3 +441,98 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     margin-right: 5px;
     font-size: 0.8em;
 }
+
+/* 검색 UI 스타일 */
+#search-icon {
+    margin-left: auto; /* 아이콘을 헤더의 오른쪽 끝으로 밀어냅니다. */
+    cursor: pointer;
+    font-size: 1.2em;
+    padding: 5px; /* 클릭 영역을 살짝 넓혀줍니다. */
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+#search-icon:hover {
+    background-color: #e0e0e0;
+}
+
+
+/* 2. 헤더 아래에 나타나는 '검색 전용 바' 스타일 */
+.search-bar {
+    display: flex; /* 내부 요소들을 가로로 정렬합니다. */
+    align-items: center; /* 세로 중앙 정렬 */
+    justify-content: space-between; /* 요소들을 양쪽 끝으로 분산 배치합니다. */
+    padding: 8px 12px;
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    animation: slide-down 0.3s ease-out; /* 나타날 때 부드러운 애니메이션 효과 */
+}
+
+/* 검색 바가 숨겨져 있을 때의 스타일 */
+.search-bar.hidden {
+    display: none;
+}
+
+
+/* 3. 검색 바 내부 요소들 스타일 */
+
+/* 검색어 입력창 */
+#search-input {
+    flex-grow: 1; /* 입력창이 남는 공간을 모두 차지하도록 설정 */
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    padding: 6px 10px;
+    font-size: 0.95em;
+    margin-right: 15px; /* 오른쪽 버튼들과의 간격 */
+}
+
+/* 결과 수 + 이동 버튼을 묶는 컨테이너 */
+#search-nav {
+    display: flex;
+    align-items: center;
+}
+
+/* 결과 수 (예: 1 / 5) */
+#search-count {
+    font-size: 0.9em;
+    margin-right: 8px;
+    color: #555;
+}
+
+/* 위/아래 이동 버튼 */
+#search-prev-button,
+#search-next-button {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 0 2px;
+    padding: 3px 6px;
+    font-size: 0.8em;
+}
+#search-prev-button:hover,
+#search-next-button:hover {
+    background-color: #e9e9e9;
+}
+
+
+/* 4. 메시지 하이라이트 효과 */
+.message-container.highlight {
+    background-color: #fff8c4; /* 연한 노란색 하이라이트 */
+    transition: background-color 0.5s ease;
+    border-radius: 8px; /* 하이라이트 영역에 둥근 모서리 적용 */
+}
+
+
+/* 5. 기타 유틸리티 스타일 */
+
+/* 검색 바가 나타나는 애니메이션 효과 */
+@keyframes slide-down {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
