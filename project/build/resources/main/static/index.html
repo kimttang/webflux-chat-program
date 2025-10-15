@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>실시간 번역 채팅</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+<div class="container">
+    <div id="auth-screen" class="content-container">
+        <div class="language-selector-container">
+            <select id="language-selector-auth">
+                <option value="ko">한국어</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+                <option value="zh">中文</option>
+                <option value="ar">العربية</option>
+            </select>
+        </div>
+        <div id="login-form" class="form-container">
+            <h1 id="login-title"></h1>
+            <div class="input-group"><input type="text" id="login-username"></div>
+            <div class="input-group"><input type="password" id="login-password"></div>
+            <button id="login-button" class="auth-button"></button>
+            <p id="login-error" class="error-message hidden"></p>
+            <p style="text-align: center; margin-top: 15px;"><span id="signup-prompt"></span> <a href="#" id="show-signup"></a></p>
+        </div>
+        <div id="signup-form" class="form-container hidden">
+            <h1 id="signup-title"></h1>
+            <div class="input-group"><input type="text" id="signup-nickname"></div>
+            <div class="input-group"><input type="text" id="signup-username"></div>
+            <div class="input-group"><input type="password" id="signup-password"></div>
+            <button id="signup-button" class="auth-button"></button>
+            <p id="signup-error" class="error-message hidden"></p>
+            <p style="text-align: center; margin-top: 15px;"><span id="login-prompt"></span> <a href="#" id="show-login"></a></p>
+        </div>
+    </div>
+    <div id="main-screen" class="main-container hidden">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div id="user-profile-clickable" class="user-profile">
+                    <img id="profile-picture" src="" alt="Profile Picture">
+                    <span id="username-display"></span>
+                </div>
+                <button id="logout-button"></button>
+            </div>
+            <div class="sidebar-body">
+                <ul id="friend-list" class="friend-list"></ul>
+                <ul id="room-list" class="room-list hidden"></ul>
+            </div>
+            <div id="friends-action-area">
+                <div class="add-friend-area"><input type="text" id="friend-name-input"><button id="add-friend-button" class="button"></button></div>
+            </div>
+            <div id="chatrooms-action-area" class="hidden">
+                <div class="create-room-area"><input type="text" id="room-name-input"><button id="create-room-button" class="button"></button></div>
+            </div>
+            <div class="tabs">
+                <div class="tab active" data-tab="friends" id="friends-tab-button"></div>
+                <div class="tab" data-tab="chatrooms" id="chatrooms-tab-button"></div>
+            </div>
+        </div>
+    </div>
+    <div id="chat-screen" class="chat-container hidden">
+        <div class="header">
+            <button id="back-to-main" class="back-button">←</button>
+            <h2 id="chat-title" class="chat-title"></h2>
+        </div>
+        <div id="chat-window" class="chat-window"></div>
+        <div id="typing-indicator" class="typing-indicator"></div>
+        <div id="reply-bar" class="reply-bar hidden">
+            <div class="reply-bar-content">
+                <strong id="reply-to-user"></strong>
+                <p id="reply-to-message"></p>
+            </div>
+            <button id="cancel-reply-button" class="cancel-reply-btn">&times;</button>
+        </div>
+        <div class="input-area">
+            <input type="file" id="file-input" class="hidden"><button id="upload-button" class="upload-button">📎</button>
+            <select id="language-select">
+                <option id="lang-none" value=""></option><option id="lang-en" value="en"></option><option id="lang-ja" value="ja"></option><option id="lang-zh" value="zh"></option><option id="lang-ar" value="ar"></option>
+            </select>
+            <input type="text" id="message-input"><button id="send-button" class="button"></button>
+        </div>
+    </div>
+</div>
+<div id="profile-edit-overlay" class="hidden">
+    <div id="profile-edit-modal">
+        <img id="profile-edit-preview" src="" alt="Profile Preview">
+        <input type="file" id="profile-edit-file-input" class="hidden" accept="image/*">
+        <button id="profile-edit-picture-button" class="button">사진 변경</button>
+        <input type="text" id="profile-edit-nickname">
+        <div class="profile-edit-buttons">
+            <button id="profile-edit-cancel" class="button">취소</button>
+            <button id="profile-edit-save" class="button">저장</button>
+        </div>
+    </div>
+</div>
+<div id="participants-overlay" class="modal-overlay hidden">
+    <div id="participants-modal" class="modal">
+        <div class="modal-header">
+            <h2 id="participants-title">대화 상대</h2>
+            <button id="close-participants-modal" class="close-button">&times;</button>
+        </div>
+        <div id="participants-list" class="modal-content">
+        </div>
+    </div>
+</div>
+<div id="invite-friend-overlay" class="modal-overlay hidden">
+    <div id="invite-friend-modal" class="modal">
+        <div class="modal-header">
+            <h2 id="invite-friend-title">친구 초대</h2>
+            <button id="close-invite-modal-button" class="close-modal-button">&times;</button>
+        </div>
+        <div class="modal-body"><ul id="invite-friend-list" class="user-list"></ul></div>
+    </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>

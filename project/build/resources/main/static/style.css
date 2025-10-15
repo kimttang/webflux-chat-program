@@ -1,0 +1,443 @@
+:root {
+    --main-color: #5B96F7; --gray-color: #888;
+    --other-message-color: #FFFFFF; --hover-color: #4a88f5; --active-color: #4CAF50;
+    --my-message-color: #F1F3F5;
+    --main-bg-color: #A5C7FF;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: var(--main-bg-color); }
+.container { width: 450px; height: 700px; background: white; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden; display: flex; flex-direction: column; }
+.content-container { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.form-container { padding: 25px; box-sizing: border-box; }
+.main-container { flex-grow: 1; }
+.chat-container { height: 100%; display: flex; flex-direction: column; }
+.hidden { display: none !important; }
+h1, h2 { text-align: center; color: #333; }
+.input-group { margin-bottom: 15px; }
+input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+.button, .auth-button { width: 100%; padding: 12px; border: none; border-radius: 5px; background-color: var(--main-color); color: white; font-size: 16px; cursor: pointer; transition: background-color 0.2s; }
+.button:hover, .auth-button:hover { background-color: var(--hover-color); }
+.error-message { color: red; text-align: center; margin-top: 10px; }
+.header { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee; background-color: white; position: relative; }
+.back-button { background: none; border: none; font-size: 24px; cursor: pointer; margin-right: 10px; z-index: 1; }
+.chat-title { font-size: 18px; font-weight: bold; position: absolute; left: 50%; transform: translateX(-50%); margin: 0; }
+.chat-window { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; background-color: var(--main-bg-color); }
+.input-area { display: flex; padding: 15px; border-top: 1px solid #eee; align-items: center; background-color: white; }
+#message-input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; margin-right: 10px; }
+#send-button { padding: 10px 15px; border: none; background-color: var(--main-color); color: white; border-radius: 20px; font-size: 14px; cursor: pointer; }
+.message-container { display: flex; margin-bottom: 15px; max-width: 80%; }
+.message-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #ccc; margin-right: 10px; display: flex; justify-content: center; align-items: center; font-weight: bold; color: white; }
+.message-content { display: flex; flex-direction: column; }
+.message-sender { font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+.message-bubble { padding: 10px 15px; border-radius: 18px; }
+.other-message { align-self: flex-start; }
+.other-message .message-bubble { background-color: var(--other-message-color); border: 1px solid #eee; }
+.my-message { align-self: flex-end; flex-direction: row-reverse; }
+.my-message .message-bubble { background-color: var(--my-message-color); }
+.my-message .message-avatar { margin-left: 10px; margin-right: 0; }
+.bubble-wrapper { display: flex; align-items: flex-end; }
+.message-time { font-size: 0.75em; color: var(--gray-color); text-align: right; }
+.system-message { text-align: center; color: var(--gray-color); font-size: 12px; margin: 10px 0; }
+.sidebar { width: 100%; padding: 0; display: flex; flex-direction: column; height: 100%; }
+.sidebar-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+.user-profile { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+#profile-picture { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background-color: #eee; }
+#username-display { font-size: 16px; font-weight: bold; }
+.sidebar-body { flex-grow: 1; overflow-y: auto; background-color: var(--main-bg-color); }
+.room-list, .friend-list { list-style: none; padding: 0; margin: 0; }
+.room-list li, .friend-list li { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+.room-list li:hover, .friend-list li:hover { background-color: rgba(255,255,255,0.2); }
+.create-room-area, .add-friend-area { padding: 15px; display: flex; background-color: var(--main-bg-color); }
+#room-name-input, #friend-name-input { flex-grow: 1; margin-right: 10px; }
+#add-friend-button, #create-room-button { padding: 10px 15px; }
+.tabs { display: flex; border-top: 1px solid #eee; }
+.tab { flex: 1; text-align: center; padding: 15px; cursor: pointer; background: #f9f9f9; }
+.tab.active { background: white; font-weight: bold; }
+.friend-list li .button { width: auto; padding: 5px 15px; font-size: 12px; flex-shrink: 0; }
+.friend-info { display: flex; align-items: center; gap: 12px; }
+.friend-avatar-container { position: relative; }
+.friend-avatar { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; }
+.status-circle { width: 12px; height: 12px; border-radius: 50%; background-color: #ccc; position: absolute; bottom: 0; right: 0; border: 2px solid white; }
+.status-circle.online { background-color: var(--active-color); }
+.unread-badge { background-color: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 12px; }
+.translated-message { color: #0366d6; font-style: italic; margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ddd; }
+.typing-indicator { color: var(--gray-color); font-size: 12px; height: 18px; padding: 0 15px; background-color: var(--main-bg-color); }
+#language-select { padding: 8px; border-radius: 5px; border: 1px solid #ddd; margin-right: 10px; }
+.upload-button { font-size: 20px; background: none; border: none; cursor: pointer; margin-right: 10px; color: #555; }
+.chat-image { max-width: 100%; border-radius: 10px; margin-top: 5px; }
+.chat-file-link { display: block; background-color: #f1f1f1; padding: 10px; border-radius: 8px; text-decoration: none; color: #333; margin-top: 5px; }
+.chat-file-link:hover { background-color: #e5e5e5; }
+.chat-file-link span { margin-left: 8px; }
+.language-selector-container { padding: 0 25px 15px; text-align: right; }
+#language-selector-auth { padding: 5px; border-radius: 5px; border: 1px solid #ddd; }
+#logout-button { padding: 5px 10px; font-size: 12px; width: auto; background-color: #f1f1f1; color: #333; border: 1px solid #ddd; }
+#logout-button:hover { background-color: #e1e1e1; }
+#profile-edit-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+#profile-edit-modal { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 300px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+#profile-edit-preview { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; }
+#profile-edit-picture-button { width: 120px; padding: 8px; font-size: 14px; background-color: #f0f0f0; color: #333; border: 1px solid #ccc; }
+#profile-edit-nickname { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; text-align: center; font-size: 16px; }
+.profile-edit-buttons { display: flex; gap: 10px; width: 100%; }
+#profile-edit-save, #profile-edit-cancel { flex: 1; padding: 10px; font-size: 14px; }
+#profile-edit-cancel { background-color: #6c757d; }
+.chat-window::-webkit-scrollbar, .sidebar-body::-webkit-scrollbar { width: 8px; }
+.chat-window::-webkit-scrollbar-track, .sidebar-body::-webkit-scrollbar-track { background: transparent; }
+.chat-window::-webkit-scrollbar-thumb, .sidebar-body::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.2); border-radius: 4px; }
+.chat-window::-webkit-scrollbar-thumb:hover, .sidebar-body::-webkit-scrollbar-thumb:hover { background-color: rgba(0, 0, 0, 0.4); }
+.deleted-message { color: #888; font-style: italic; }
+.message-meta {display: flex; flex-direction: column; align-self: flex-end; margin: 0 5px;white-space: nowrap;}
+.edited-indicator { font-size: 0.7em; color: #888; text-align: right;}
+.read-indicator {font-size: 0.7em; color: var(--main-color); font-weight: bold; text-align: right;}
+.message-menu-container { position: relative;margin-right: 8px; align-self: center;}
+.menu-gear-icon { cursor: pointer; opacity: 0; transition: opacity 0.2s; }
+.chat-message-item:hover .menu-gear-icon { opacity: 0.7; }
+.menu-gear-icon:hover { opacity: 1; }
+.chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* 이 속성이 자식 요소들을 양쪽 끝으로 밀어냅니다. */
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+}
+.button {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    cursor: pointer;
+}
+
+.chat-title {
+    flex-grow: 1; /* 제목이 남은 공간을 차지하도록 설정 */
+    text-align: center; /* 제목 중앙 정렬 */
+}
+
+
+/* --- 아이콘 버튼 스타일 (새로 추가) --- */
+.chat-header-buttons {
+    display: flex;
+    gap: 10px; /* 버튼 사이의 간격 */
+    margin-left: auto; /* 이 줄을 추가하여 오른쪽으로 정렬 */
+}
+
+.icon-button {
+    background: none;
+    border: 1px solid transparent; /* 평소에는 테두리 투명하게 */
+    color: #555;
+    font-size: 1.3em; /* 아이콘 크기 */
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 5px;
+    transition: all 0.2s ease-in-out; /* 부드러운 효과 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 마우스를 올렸을 때 스타일 */
+.icon-button:hover {
+    border-color: #ccc; /* 회색 테두리 표시 */
+    background-color: #f0f0f0; /* 약간의 배경색 추가 */
+}
+
+.icon-button i {
+    pointer-events: none; /* 아이콘 클릭 시 발생할 수 있는 오류 방지 */
+}
+.other-message .message-meta{order: 1;}
+.other-message .edited-indicator,.other-message .message-time {text-align: left;}
+
+.menu-options-popup {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    display: flex; gap: 8px;
+    background-color: white; border: 1px solid #ddd;
+    border-radius: 20px; padding: 5px 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-bottom: 5px;
+}
+.menu-options-popup.hidden { display: none; }
+.menu-option-icon { cursor: pointer; font-size: 1.2em; }
+.menu-option-icon:hover { transform: scale(1.2); }
+
+.edit-container { display: flex; align-items: center; }
+.edit-input { flex-grow: 1; border: 1px solid #ccc; border-radius: 5px; padding: 5px; }
+.edit-container button { margin-left: 5px; }
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: white;
+    border-radius: 8px;
+    width: 300px;
+    max-height: 80%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    color: #888;
+}
+
+.modal-content {
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.participant-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    gap: 15px;
+}
+
+.participant-item img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.participant-item span {
+    font-weight: bold;
+}
+/* ================================== */
+/* [추가] 연속 메시지 묶기 스타일      */
+/* ================================== */
+
+/* 새로운 대화 그룹의 첫 메시지에 위쪽 여백 추가 */
+.message-container.initial {
+    margin-top: 15px;
+}
+
+/* 그룹 내의 연속되는 메시지는 위쪽 여백을 더 적게 줌 */
+.message-container.continuous {
+    margin-top: 5px;
+}
+
+/* 다른 사람의 연속 메시지는 프로필 사진 공간만큼 들여쓰기 */
+.other-message.continuous .message-content {
+    /* 아바타 너비(40px) + 오른쪽 여백(8px) 만큼 왼쪽으로 밀어 정렬 */
+    margin-left: 48px;
+}
+
+/* ================================== */
+/* [추가] 프로필 사진(아바타) 스타일   */
+/* ================================== */
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%; /* 이미지를 원형으로 */
+    margin-right: 8px;   /* 메시지 내용과의 간격 */
+    align-self: flex-start;
+}
+
+/* [수정] 연속되는 상대방 메시지는
+  프로필 사진 공간만큼 들여쓰기하여 정렬을 맞춥니다.
+*/
+.other-message.continuous .message-content {
+    margin-left: 48px; /* 아바타 너비(40px) + 오른쪽 여백(8px) */
+}
+/* ================================== */
+/* [추가] 연속 메시지 시간 표시 숨기기 */
+/* ================================== */
+
+/* 바로 뒤에 .continuous 메시지가 따라오는 메시지의 시간(.message-meta)을 숨김 */
+.message-container:has(+ .message-container.continuous) .message-meta {
+    display: none;
+}
+/* ================================== */
+/* [추가] 읽음 카운트 및 메타 데이터 스타일 */
+/* ================================== */
+
+/* 메시지 메타 정보 (시간, 안 읽음 카운트) 컨테이너 */
+.message-meta {
+    align-self: flex-end; /* 메시지 버블 아래, 세로 정렬의 끝으로 보냄 */
+    display: flex;
+    flex-direction: column; /* 아이템을 세로로 정렬 */
+    align-items: flex-end;  /* 오른쪽 정렬 */
+    margin: 0 5px;
+    font-size: 0.7em;
+    color: var(--gray-color);
+    min-width: 55px; /* 최소 너비 확보 */
+}
+
+/* 내 메시지일 경우, 메타 정보의 정렬을 왼쪽으로 변경 */
+.my-message .message-meta {
+    align-items: flex-start;
+}
+
+/* 안 읽은 사람 수 스타일 */
+.unread-count {
+    font-weight: bold;
+    color: var(--main-color);
+    margin-bottom: 3px; /* 시간과의 간격 */
+    transition: opacity 0.3s ease; /* 부드러운 사라짐/나타남 효과 */
+}
+
+/* 안 읽은 사람 수가 0이거나 없을 때 숨기기 위한 클래스 */
+.unread-count.hidden {
+    opacity: 0;
+    pointer-events: none; /* 숨겨졌을 때 클릭 등 이벤트 방지 */
+}
+
+#invite-friend-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* 리스트 아이템(li)은 flex 컨테이너 역할을 합니다. */
+.invite-friend-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* 자식 요소들을 양쪽 끝으로 보냅니다. */
+    padding: 8px 12px; /* 아이템 안쪽 여백 (좌우 12px) */
+    border-top: 1px solid #ddd;
+}
+
+/* 왼쪽 그룹 (프로필 사진 + 닉네임) */
+.invite-user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* 사진과 닉네임 사이의 간격 */
+}
+
+/* 오른쪽 요소 (초대 버튼) */
+.invite-action-button {
+    /* 이 버튼은 justify-content에 의해 자동으로 오른쪽에 정렬됩니다. */
+    padding: 6px 12px;
+    background-color: var(--main-color);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.invite-action-button:disabled {
+    background-color: #aaa;
+}
+
+.no-results {
+    text-align: center;
+    padding: 20px;
+    color: #888;
+}
+/* ✨ 추가: 답장 미리보기 바 스타일 */
+.reply-bar {
+    padding: 8px 15px;
+    background-color: #f1f3f5;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+}
+
+.reply-bar-content p {
+    margin: 0;
+    color: #555;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+}
+
+.cancel-reply-btn {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    color: var(--gray-color);
+}
+
+.bubble-wrapper {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+}
+
+.message-action-button.reply-button {
+    background: transparent;
+    border: none;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 1.2em;
+
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+
+    order: 3;
+    margin-left: 8px;
+}
+
+.other-message .bubble-wrapper:hover .reply-button {
+    opacity: 1;
+}
+    /* 상대방 메시지(.other-message) 안의 메뉴 컨테이너 위치 조정 */
+.other-message .message-menu-container {
+    left: 100%;      /* 버블의 오른쪽 끝에 붙임 */
+    right: auto;     /* 기존 오른쪽 정렬을 취소 */
+    margin-left: 8px; /* 버블과 약간의 간격을 줌 */
+}
+
+/* 상대방 메시지 안의 팝업 메뉴 위치 조정 */
+.other-message .menu-options-popup {
+    left: 0;         /* 톱니바퀴 아이콘 바로 아래에서 시작 */
+    right: auto;
+}
+
+/* [추가] 저장된 번역을 보여주는 컨테이너 스타일 */
+.saved-translations-container {
+    background-color: #f0f0f0;
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 5px;
+    font-size: 0.9em;
+    border: 1px solid #e0e0e0;
+}
+
+.translation-item {
+    margin-bottom: 5px;
+}
+
+.translation-item:last-child {
+    margin-bottom: 0;
+}
+
+.lang-tag {
+    background-color: var(--main-color);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-right: 5px;
+    font-size: 0.8em;
+}
