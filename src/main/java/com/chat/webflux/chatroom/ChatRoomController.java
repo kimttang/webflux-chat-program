@@ -1,5 +1,6 @@
 package com.chat.webflux.chatroom;
 
+import com.chat.webflux.dto.ChatRoomDto;
 import com.chat.webflux.user.User;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,6 +8,8 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -22,9 +25,8 @@ public class ChatRoomController {
     private final ObjectMapper objectMapper;
 
     @GetMapping(value = "/{username}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> getChatRoomStream(@PathVariable String username) {
-        return chatRoomService.getChatRoomUpdates(username)
-                .flatMap(this::convertListToJson);
+    public Flux<List<ChatRoomDto>> getChatRoomStream(@PathVariable String username) {
+        return chatRoomService.getChatRoomUpdates(username);
     }
 
     @Getter
@@ -73,5 +75,15 @@ public class ChatRoomController {
         } catch (JsonProcessingException e) {
             return Mono.error(e);
         }
+    }
+    @PostMapping("/{roomId}/profile")
+    public Mono<ResponseEntity<ChatRoom>> updateChatRoomProfile(
+            @PathVariable String roomId,
+            @RequestPart("newName") String newName,
+            @RequestPart(name = "profileImage", required = false) Mono<FilePart> filePartMono) {
+
+        return chatRoomService.updateChatRoomProfile(roomId, newName, filePartMono)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 }

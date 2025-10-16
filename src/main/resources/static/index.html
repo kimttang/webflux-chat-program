@@ -43,6 +43,10 @@
                     <img id="profile-picture" src="" alt="Profile Picture">
                     <span id="username-display"></span>
                 </div>
+                <div class="filter-buttons hidden">
+                    <button id="show-all-chats-button" class="filter-button active">전체</button>
+                    <button id="show-unread-chats-button" class="filter-button">안읽음</button>
+                </div>
                 <button id="logout-button"></button>
             </div>
             <div class="sidebar-body">
@@ -53,7 +57,9 @@
                 <div class="add-friend-area"><input type="text" id="friend-name-input"><button id="add-friend-button" class="button"></button></div>
             </div>
             <div id="chatrooms-action-area" class="hidden">
-                <div class="create-room-area"><input type="text" id="room-name-input"><button id="create-room-button" class="button"></button></div>
+                <div class="create-room-area">
+                    <input type="text" id="room-name-input">
+                    <button id="create-room-button" class="button"></button></div>
             </div>
             <div class="tabs">
                 <div class="tab active" data-tab="friends" id="friends-tab-button"></div>
@@ -64,8 +70,10 @@
     <div id="chat-screen" class="chat-container hidden">
         <div class="header">
             <button id="back-to-main" class="back-button">←</button>
-            <h2 id="chat-title" class="chat-title"></h2>
-
+            <div id="chat-header-info">
+                <img id="chat-room-profile-header" src="" alt="Room Profile" class="header-profile-pic">
+                <span id="chat-room-name-header"></span>
+            </div>
             <span id="search-icon">🔍</span>
         </div>
 
@@ -96,8 +104,12 @@
         </div>
     </div>
 </div>
-<div id="profile-edit-overlay" class="hidden">
-    <div id="profile-edit-modal">
+<div id="profile-edit-overlay" class="modal-overlay hidden"> <div id="profile-edit-modal" class="modal">
+    <div class="modal-header">
+        <h2>프로필 설정</h2>
+        <button id="close-profile-edit-modal" class="close-button">&times;</button>
+    </div>
+    <div class="modal-content profile-edit-content">
         <img id="profile-edit-preview" src="" alt="Profile Preview">
         <input type="file" id="profile-edit-file-input" class="hidden" accept="image/*">
         <button id="profile-edit-picture-button" class="button">사진 변경</button>
@@ -107,6 +119,7 @@
             <button id="profile-edit-save" class="button">저장</button>
         </div>
     </div>
+</div>
 </div>
 <div id="participants-overlay" class="modal-overlay hidden">
     <div id="participants-modal" class="modal">
@@ -125,6 +138,24 @@
             <button id="close-invite-modal-button" class="close-modal-button">&times;</button>
         </div>
         <div class="modal-body"><ul id="invite-friend-list" class="user-list"></ul></div>
+    </div>
+</div>
+<div id="room-edit-overlay" class="modal-overlay hidden">
+    <div id="room-edit-modal" class="modal">
+        <div class="modal-header">
+            <h2>채팅방 설정</h2>
+            <button id="close-room-edit-modal" class="close-button">&times;</button>
+        </div>
+        <div class="modal-content profile-edit-content">
+            <img id="room-edit-preview" src="" alt="Profile Preview">
+            <input type="file" id="room-edit-file-input" class="hidden" accept="image/*">
+            <button id="room-edit-picture-button" class="button">사진 변경</button>
+            <input type="text" id="room-edit-name" placeholder="새 채팅방 이름">
+            <div class="profile-edit-buttons">
+                <button id="room-edit-cancel-button" class="button">취소</button>
+                <button id="room-edit-save-button" class="button">저장</button>
+            </div>
+        </div>
     </div>
 </div>
 <script src="script.js"></script>

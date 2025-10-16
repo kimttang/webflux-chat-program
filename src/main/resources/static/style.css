@@ -44,7 +44,8 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 #username-display { font-size: 16px; font-weight: bold; }
 .sidebar-body { flex-grow: 1; overflow-y: auto; background-color: var(--main-bg-color); }
 .room-list, .friend-list { list-style: none; padding: 0; margin: 0; }
-.room-list li, .friend-list li { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+.friend-list li { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+.room-list li {display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f0f0f0;}
 .room-list li:hover, .friend-list li:hover { background-color: rgba(255,255,255,0.2); }
 .create-room-area, .add-friend-area { padding: 15px; display: flex; background-color: var(--main-bg-color); }
 #room-name-input, #friend-name-input { flex-grow: 1; margin-right: 10px; }
@@ -71,14 +72,13 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 #language-selector-auth { padding: 5px; border-radius: 5px; border: 1px solid #ddd; }
 #logout-button { padding: 5px 10px; font-size: 12px; width: auto; background-color: #f1f1f1; color: #333; border: 1px solid #ddd; }
 #logout-button:hover { background-color: #e1e1e1; }
-#profile-edit-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-#profile-edit-modal { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 300px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
 #profile-edit-preview { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; }
-#profile-edit-picture-button { width: 120px; padding: 8px; font-size: 14px; background-color: #f0f0f0; color: #333; border: 1px solid #ccc; }
+#profile-edit-picture-button, #room-edit-picture-button { width: 120px; padding: 8px; font-size: 14px; background-color: #f0f0f0; color: #333; border: 1px solid #ccc; }
+#profile-edit-picture-button:hover, #room-edit-picture-button:hover {background-color: #e0e0e0;}
 #profile-edit-nickname { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; text-align: center; font-size: 16px; }
 .profile-edit-buttons { display: flex; gap: 10px; width: 100%; }
 #profile-edit-save, #profile-edit-cancel { flex: 1; padding: 10px; font-size: 14px; }
-#profile-edit-cancel { background-color: #6c757d; }
+#profile-edit-cancel, #room-edit-cancel-button { background-color: #6c757d; }
 .chat-window::-webkit-scrollbar, .sidebar-body::-webkit-scrollbar { width: 8px; }
 .chat-window::-webkit-scrollbar-track, .sidebar-body::-webkit-scrollbar-track { background: transparent; }
 .chat-window::-webkit-scrollbar-thumb, .sidebar-body::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.2); border-radius: 4px; }
@@ -189,21 +189,29 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px;
-    border-bottom: 1px solid #eee;
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
 }
 
 .modal-header h2 {
     margin: 0;
     font-size: 1.1em;
+    color: #333;
 }
 
 .close-button {
     background: none;
     border: none;
-    font-size: 1.5em;
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #aaa;
     cursor: pointer;
-    color: #888;
+    padding: 0;
+    line-height: 1;
+}
+
+.close-button:hover {
+    color: #333;
 }
 
 .modal-content {
@@ -535,4 +543,195 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.room-details {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-grow: 1;
+}
+
+/* 채팅방 이름 스타일 */
+.room-name {
+    font-weight: bold;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 마지막 메시지 스타일 */
+.last-message {
+    font-size: 0.85em;
+    color: #888;
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.room-header {
+    display: flex;
+    justify-content: space-between; /* 핵심: 내부 요소들을 양쪽 끝으로 보냄 */
+    align-items: baseline; /* 이름과 시간의 글자 밑단을 맞춰줌 */
+    width: 100%;
+}
+
+.last-message-time {
+    font-size: 0.8em; /* 글자 크기를 약간 작게 */
+    color: #999; /* 회색 계열로 설정 */
+    flex-shrink: 0; /* 공간이 부족해도 줄어들지 않도록 설정 */
+    margin-left: 8px; /* 이름과 시간 사이의 최소 간격 */
+}
+
+/* 채팅 헤더의 프로필 사진 */
+.header-profile-pic {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    margin-right: 10px;
+    object-fit: cover;
+    background-color: #eee; /* 이미지가 없을 때 배경색 */
+}
+
+/* 채팅 헤더의 정보 영역 (사진 + 이름) */
+#chat-header-info {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    overflow: hidden;
+    cursor: pointer; /* ✅ 마우스 커서를 손가락 모양으로 변경 */
+    transition: background-color 0.2s; /* 부드러운 효과를 위한 전환 */
+    border-radius: 8px; /* 클릭 영역을 보기 좋게 만듦 */
+    padding: 5px;
+}
+#chat-header-info:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* 채팅방 목록의 프로필 사진 */
+.room-list-profile-pic {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    margin-right: 12px;
+    object-fit: cover;
+    background-color: #f0f0f0;
+}
+
+/* 프로필 수정 모달 내부 컨텐츠 스타일 */
+.profile-edit-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+.profile-edit-content img {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    margin-bottom: 15px;
+    object-fit: cover;
+    border: 3px solid #f0f0f0;
+}
+
+.profile-edit-content input[type="text"] {
+    width: 80%;
+    padding: 10px;
+    margin: 15px 0;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+/* 목록의 각 항목(<li>)에 대한 기본 설정 */
+.room-list .chat-room-item {
+    display: flex;           /* 내부 요소를 가로로 배치 (이미지, 내용, 정보) */
+    align-items: center;     /* 세로 중앙 정렬 */
+    padding: 12px 15px;      /* 안쪽 여백 */
+    border-bottom: 1px solid #f0f0f0; /* 구분선 */
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.room-list .chat-room-item:hover {
+    background-color: #f9f9f9; /* 마우스를 올렸을 때 배경색 */
+}
+
+/* 목록에 표시되는 프로필 사진 */
+.list-profile-pic {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    margin-right: 12px;
+    flex-shrink: 0; /* 창이 좁아져도 이미지가 찌그러지지 않음 */
+    object-fit: cover;
+}
+
+/* 채팅방 이름과 마지막 메시지를 감싸는 영역 */
+.chat-room-details {
+    flex-grow: 1;      /* 남는 공간을 모두 차지 */
+    overflow: hidden;    /* 내용이 길면 숨김 처리 */
+}
+
+/* 채팅방 이름 스타일 */
+.chat-room-name {
+    font-weight: 600;
+    color: #333;
+    white-space: nowrap;     /* 줄바꿈 방지 */
+    overflow: hidden;
+    text-overflow: ellipsis; /* 이름이 길면 ...으로 표시 */
+}
+
+/* 마지막 메시지 스타일 */
+.chat-room-details .last-message {
+    font-size: 0.9em;
+    color: #888;
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* 메시지가 길면 ...으로 표시 */
+}
+
+/* 시간과 안 읽음 뱃지를 감싸는 영역 */
+.chat-room-meta {
+    display: flex;
+    flex-direction: column;  /* 시간과 뱃지를 세로로 배치 */
+    align-items: flex-end;   /* 오른쪽 정렬 */
+    margin-left: 10px;       /* 왼쪽 영역과 간격 띄우기 */
+    font-size: 0.8em;
+    color: #999;
+}
+/* 버튼들을 감싸는 전체 영역 */
+.sidebar-header .filter-buttons {
+    /* 기존 스타일과 동일 */
+    display: flex;
+    gap: 8px;
+}
+
+/* 개별 버튼 기본 스타일 */
+.filter-button {
+    padding: 6px 14px; /* 내부 여백 조정 */
+    border: none; /* 투박한 테두리 제거 */
+    background-color: #e9e9eb; /* 부드러운 회색 배경 */
+    color: #555; /* 너무 진하지 않은 글자색 */
+    cursor: pointer;
+    border-radius: 18px; /* 더 둥글게 처리 */
+    font-size: 13px; /* 폰트 크기 조정 */
+    font-weight: 500; /* 살짝 두께감 추가 */
+    transition: all 0.2s ease-in-out; /* 모든 효과를 부드럽게 전환 */
+}
+
+/* 버튼에 마우스를 올렸을 때 */
+.filter-button:hover {
+    background-color: #dcdce0; /* 살짝 더 진한 회색 */
+}
+
+/* 'active' 클래스가 적용된 활성화된 버튼 */
+.filter-button.active {
+    background-color: #007bff; /* 포인트 색상 (기존 var(--main-color)를 사용해도 좋습니다) */
+    color: white; /* 흰색 글씨 */
+    font-weight: 600; /* 더 굵게 */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 입체감을 주는 그림자 효과 */
 }

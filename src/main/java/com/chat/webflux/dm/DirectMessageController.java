@@ -40,7 +40,7 @@ public class DirectMessageController {
 
         String roomId = Arrays.stream(new String[]{fromUser, toUser})
                 .sorted()
-                .collect(Collectors.joining("&"));
+                .collect(Collectors.joining("-"));
 
         // 두 사용자의 정보를 DB에서 조회
         Mono<User> fromUserMono = userRepository.findByUsername(fromUser);

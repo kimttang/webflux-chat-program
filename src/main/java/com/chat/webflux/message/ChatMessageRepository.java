@@ -10,4 +10,5 @@ public interface ChatMessageRepository extends ReactiveMongoRepository<ChatMessa
     Mono<Void> deleteByRoomId(String roomId);
     @Query("{ 'roomId': ?0, '$text': { '$search': ?1 } }")
     Flux<ChatMessage> findByRoomIdAndSearchKeyword(String roomId, String keyword);
+    Mono<ChatMessage> findTopByRoomIdOrderByCreatedAtDesc(String roomId);
 }

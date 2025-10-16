@@ -19,6 +19,7 @@ public class ChatRoom {
     @Id
     private String id;
     private String name;
+    private String profilePictureUrl;
     private String createdBy;
     private LocalDateTime createdAt;
     private Set<String> members = new HashSet<>();
