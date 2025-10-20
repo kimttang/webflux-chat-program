@@ -1,11 +1,13 @@
 package com.chat.webflux.chatroom;
 
+import org.springframework.context.annotation.Lazy;
 import com.chat.webflux.dto.ChatRoomDto;
+import com.chat.webflux.handler.ChatWebSocketHandler;
 import com.chat.webflux.message.ChatMessageRepository;
 import com.chat.webflux.unread.UnreadCountRepository;
 import com.chat.webflux.user.User;
 import com.chat.webflux.user.UserRepository;
-import lombok.RequiredArgsConstructor;
+//import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
@@ -18,18 +20,20 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class ChatRoomService {
 
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final UnreadCountRepository unreadCountRepository;
     private final UserRepository userRepository;
+    private final ChatWebSocketHandler chatWebSocketHandler;
     @Value("${file.upload-dir}")
     private String uploadDir;
 
@@ -46,6 +50,17 @@ public class ChatRoomService {
                 Sinks.many().replay().latestOrDefault(new ArrayList<>()));
     }
 
+    public ChatRoomService(ChatRoomRepository chatRoomRepository,
+                           ChatMessageRepository chatMessageRepository,
+                           UnreadCountRepository unreadCountRepository,
+                           UserRepository userRepository,
+                           @Lazy ChatWebSocketHandler chatWebSocketHandler) { // <--- @Lazy 추가
+        this.chatRoomRepository = chatRoomRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.unreadCountRepository = unreadCountRepository;
+        this.userRepository = userRepository;
+        this.chatWebSocketHandler = chatWebSocketHandler;
+    }
     public void broadcastRoomListToUser(String username) {
         // 1. 먼저 사용자의 모든 '안 읽은 메시지 수' 정보를 Map 형태로 가져옵니다.
         Mono<Map<String, Integer>> unreadCountsMapMono = unreadCountRepository.findByUserId(username)
@@ -72,11 +87,23 @@ public class ChatRoomService {
                 )
                 .doOnSuccess(chatRoomDtos -> {
                     // 4. DTO 리스트를 마지막 메시지 시간 순으로 정렬합니다. (기존 로직과 동일)
-                    chatRoomDtos.sort((r1, r2) -> {
-                        if (r1.getLastMessage() == null && r2.getLastMessage() == null) return 0;
-                        if (r1.getLastMessage() == null) return 1;
-                        if (r2.getLastMessage() == null) return -1;
-                        return r2.getLastMessage().getCreatedAt().compareTo(r1.getLastMessage().getCreatedAt());
+                    chatRoomDtos.sort((dto1, dto2) -> {
+                        // 정렬 기준 시간 (1순위: 마지막 메시지 시간, 2순위: 채팅방 생성 시간)
+                        LocalDateTime time1 = (dto1.getLastMessage() != null)
+                                ? dto1.getLastMessage().getCreatedAt()
+                                : dto1.getRoomCreatedAt(); // 1단계에서 DTO에 추가한 필드 사용
+
+                        LocalDateTime time2 = (dto2.getLastMessage() != null)
+                                ? dto2.getLastMessage().getCreatedAt()
+                                : dto2.getRoomCreatedAt(); // 1단계에서 DTO에 추가한 필드 사용
+
+                        // null 체크 (데이터 안정성)
+                        if (time1 == null && time2 == null) return 0;
+                        if (time1 == null) return 1; // null이 뒤로
+                        if (time2 == null) return -1; // null이 뒤로
+
+                        // 최신 시간이 위로 오도록 내림차순 정렬
+                        return time2.compareTo(time1);
                     });
 
                     // 5. 정렬된 최종 목록을 사용자에게 전송(broadcast)합니다. (기존 로직과 동일)
@@ -237,4 +264,5 @@ public class ChatRoomService {
                 })
                 .doOnSuccess(this::broadcastToAllMembers); // 성공 시, 변경된 정보를 모든 멤버에게 실시간 전파
     }
+
 }

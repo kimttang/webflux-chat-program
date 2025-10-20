@@ -18,6 +18,11 @@ let intersectionObserver;
 let currentReplyToId = null;
 let currentRoomList = [];
 let currentChatRoomFilter = 'all';
+let allFriendsCache = [];
+let onlineFriendsCache = new Set();
+let currentRoomAnnouncement = null;
+let messageToAnnounce = null;
+let isAnnouncementManuallyHidden = false;
 
 const DEFAULT_PROFILE_PICTURE = "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png";
 const userCache = new Map();
@@ -80,6 +85,15 @@ const DOM = {
     loginPasswordInput: document.getElementById('login-password'),
     loginButton: document.getElementById('login-button'),
     loginError: document.getElementById('login-error'),
+    announcementBar: document.getElementById('announcement-bar'),
+    announcementContent: document.getElementById('announcement-content'),
+    removeAnnouncementBtn: document.getElementById('remove-announcement-btn'),
+    announceConfirmOverlay: document.getElementById('announce-confirm-overlay'),
+    announceConfirmModal: document.getElementById('announce-confirm-modal'),
+    closeAnnounceConfirmModal: document.getElementById('close-announce-confirm-modal'),
+    announceConfirmContent: document.getElementById('announce-confirm-content'),
+    announceConfirmCancel: document.getElementById('announce-confirm-cancel'),
+    announceConfirmPost: document.getElementById('announce-confirm-post'),
     signupPrompt: document.getElementById('signup-prompt'),
     showSignup: document.getElementById('show-signup'),
     signupTitle: document.getElementById('signup-title'),
@@ -97,7 +111,7 @@ const DOM = {
     tabs: document.querySelectorAll('.tab'),
     friendList: document.getElementById('friend-list'),
     roomList: document.getElementById('room-list'),
-    filterButtons: document.querySelector('.filter-buttons'),
+    chatFilterButtons: document.getElementById('chat-filter-buttons'),
     showAllChatsButton: document.getElementById('show-all-chats-button'),
     showUnreadChatsButton: document.getElementById('show-unread-chats-button'),
     friendsActionArea: document.getElementById('friends-action-area'),
@@ -154,6 +168,12 @@ const DOM = {
     chatHeaderInfo: document.getElementById('chat-header-info'),
     chatRoomProfileHeader: document.getElementById('chat-room-profile-header'),
     chatRoomNameHeader: document.getElementById('chat-room-name-header'),
+    headerIconsRight: document.querySelector('.header-icons-right'),
+    defaultHeaderIcons: document.getElementById('default-header-icons'),
+    showFriendSearchButton: document.getElementById('show-friend-search-button'),
+    friendSearchInput: document.getElementById('friend-search-input'),
+    hideAnnouncementBtn: document.getElementById('hide-announcement-btn'),
+    showAnnouncementBtn: document.getElementById('show-announcement-btn')
 };
 
 DOM.chatHeaderInfo.addEventListener('click', openRoomEditModal);
@@ -167,6 +187,8 @@ DOM.languageSelectorAuth.addEventListener('change', (e) => changeLanguage(e.targ
 DOM.showSignup.addEventListener('click', (e) => { e.preventDefault(); DOM.loginForm.classList.add('hidden'); DOM.signupForm.classList.remove('hidden'); });
 DOM.showLogin.addEventListener('click', (e) => { e.preventDefault(); DOM.signupForm.classList.add('hidden'); DOM.loginForm.classList.remove('hidden'); });
 DOM.logoutButton.addEventListener('click', showAuthScreen);
+DOM.hideAnnouncementBtn.addEventListener('click', hideAnnouncementBar);
+DOM.showAnnouncementBtn.addEventListener('click', showAnnouncementBar);
 
 DOM.loginButton.addEventListener('click', async () => {
     const username = DOM.loginUsernameInput.value; const password = DOM.loginPasswordInput.value;
@@ -186,29 +208,62 @@ DOM.signupButton.addEventListener('click', async () => {
 
 DOM.tabs.forEach(tab => {
     tab.addEventListener('click', () => {
+        // 1. 모든 탭에서 'active' 클래스 제거
         DOM.tabs.forEach(t => t.classList.remove('active'));
+        // 2. 클릭된 탭에 'active' 클래스 추가
         tab.classList.add('active');
+        // 3. 탭 이름 가져오기
         const tabName = tab.dataset.tab;
-
-        if (tabName === 'friends') {
-            // 친구 탭을 눌렀을 때
-            DOM.friendList.classList.remove('hidden');
-            DOM.friendsActionArea.classList.remove('hidden');
-            DOM.roomList.classList.add('hidden');
-            DOM.chatroomsActionArea.classList.add('hidden');
-            DOM.filterButtons.classList.add('hidden');
-
-        } else {
-            // 채팅 탭을 눌렀을 때
-            DOM.friendList.classList.add('hidden');
-            DOM.friendsActionArea.classList.add('hidden');
-            DOM.roomList.classList.remove('hidden');
-            DOM.chatroomsActionArea.classList.remove('hidden');
-            DOM.filterButtons.classList.remove('hidden');
-        }
+        // 4. [핵심] 위에서 만든 switchTab 함수 호출
+        switchTab(tabName);
     });
 });
+DOM.closeAnnounceConfirmModal.addEventListener('click', closeAnnounceConfirmModal);
+DOM.announceConfirmCancel.addEventListener('click', closeAnnounceConfirmModal);
+DOM.announceConfirmPost.addEventListener('click', postAnnouncement);
 
+DOM.announceConfirmOverlay.addEventListener('click', (e) => {
+    if (e.target.id === 'announce-confirm-overlay') {
+        closeAnnounceConfirmModal();
+    }
+});
+
+DOM.removeAnnouncementBtn.addEventListener('click', removeAnnouncement);
+
+DOM.showFriendSearchButton.addEventListener('click', () => {
+
+    console.log("돋보기 아이콘 클릭됨! 검색창을 엽니다."); // (디버깅용)
+    DOM.defaultHeaderIcons.classList.add('hidden');
+    // 입력창을 보여줌
+    DOM.friendSearchInput.classList.remove('hidden');
+    DOM.friendSearchInput.focus(); // 입력창에 바로 포커스
+});
+
+// [추가] 친구 검색 입력창에서 포커스를 잃었을 때 (blur)
+DOM.friendSearchInput.addEventListener('blur', () => {
+    // 입력창에 값이 없으면 다시 원래대로 복구
+    if (DOM.friendSearchInput.value === '') {
+        resetFriendSearch();
+    }
+});
+
+// [추가] 검색창에서 Enter 키를 누르면 포커스 잃기(blur)
+DOM.friendSearchInput.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') {
+        DOM.friendSearchInput.blur(); // 포커스를 잃게 하여 blur 이벤트 트리거
+    }
+});
+DOM.friendSearchInput.addEventListener('input', () => {
+    const searchText = DOM.friendSearchInput.value.toLowerCase(); // 입력값을 소문자로 변경
+
+    // 1. 캐시된 전체 친구 목록(allFriendsCache)에서 닉네임 필터링
+    const filteredFriends = allFriendsCache.filter(friend =>
+        friend.nickname.toLowerCase().includes(searchText)
+    );
+
+    // 2. 필터링된 결과로 친구 목록 다시 그리기
+    renderFriendList(filteredFriends);
+});
 DOM.addFriendButton.addEventListener('click', async () => {
     const friendUsername = DOM.friendNameInput.value; if (!friendUsername) return;
     try {
@@ -373,6 +428,73 @@ showAuthScreen();
 // ===================================================================
 // 3. 함수 선언 (Function Declarations)
 // ===================================================================
+function resetFriendSearch() {
+    // 검색창이 열려있는지(.hidden이 없는지) 확인
+    if (!DOM.friendSearchInput.classList.contains('hidden')) {
+        DOM.defaultHeaderIcons.classList.remove('hidden');
+        // 검색창을 숨김
+        DOM.friendSearchInput.classList.add('hidden');
+        DOM.friendSearchInput.value = ''; // 검색창 내용 비우기
+    }
+}
+function switchTab(tabName) {
+    if (tabName === 'friends') {
+        // 친구 탭 UI 보이기
+        DOM.friendList.classList.remove('hidden');
+        DOM.friendsActionArea.classList.remove('hidden');
+        // 채팅 탭 UI 숨기기
+        DOM.roomList.classList.add('hidden');
+        DOM.chatroomsActionArea.classList.add('hidden');
+
+        // [핵심 수정] 헤더 아이콘 토글
+        DOM.chatFilterButtons.classList.add('hidden'); // '채팅' 필터 숨김
+        DOM.showFriendSearchButton.classList.remove('hidden'); // '친구 검색' 아이콘 보임
+        resetFriendSearch(); // (혹시 검색창이 열려있었다면 닫기)
+
+    } else { // 'chatrooms' 탭
+        // 친구 탭 UI 숨기기
+        DOM.friendList.classList.add('hidden');
+        DOM.friendsActionArea.classList.add('hidden');
+        // 채팅 탭 UI 보이기
+        DOM.roomList.classList.remove('hidden');
+        DOM.chatroomsActionArea.classList.remove('hidden');
+
+        // [핵심 수정] 헤더 아이콘 토글
+        DOM.chatFilterButtons.classList.remove('hidden'); // '채팅' 필터 보임
+        DOM.showFriendSearchButton.classList.add('hidden'); // '친구 검색' 아이콘 숨김
+        resetFriendSearch(); // (혹시 검색창이 열려있었다면 닫기)
+    }
+}
+function getCharTypePriority(char) {
+    if (!char) return 5; // 기타
+    const code = char.charCodeAt(0);
+    // 1. Numbers (0-9)
+    if (code >= 48 && code <= 57) return 1;
+    // 2. Hangul (가-힣 및 ㄱ-ㅎ)
+    if ((code >= 44032 && code <= 55203) || (code >= 12593 && code <= 12643)) return 2;
+    // 3. Lowercase English (a-z)
+    if (code >= 97 && code <= 122) return 3;
+    // 4. Uppercase English (A-Z)
+    if (code >= 65 && code <= 90) return 4;
+    // 5. Other
+    return 5;
+}
+function sortFriends(a, b) {
+    // User 객체의 nickname 필드를 기준으로 정렬합니다.
+    const aName = a.nickname;
+    const bName = b.nickname;
+    if (!aName) return 1; // 이름 없는 경우 맨 뒤로
+    if (!bName) return -1;
+    const aType = getCharTypePriority(aName[0]);
+    const bType = getCharTypePriority(bName[0]);
+    // 1. 카테고리별 정렬 (숫자 > 한글 > 소문자 > 대문자 순)
+    if (aType !== bType) {
+        return aType - bType; // 오름차순 (1이 2보다 앞에)
+    }
+    // 2. 같은 카테고리 내에서는 '오름차순' 정렬
+    // localeCompare는 기본적으로 오름차순입니다. (aName이 bName보다 앞이면 -1)
+    return aName.localeCompare(bName, 'ko');
+}
 async function getUserDetails(username) {
     if (userCache.has(username)) {
         return userCache.get(username);
@@ -459,13 +581,30 @@ function changeLanguage(lang) {
     DOM.chatScreen.classList.add('hidden');
     fetch(`/api/users/${currentUser}/details`).then(response => response.ok ? response.json() : Promise.reject('User not found')).then(user => { currentUser = user.username; currentUserNickname = user.nickname; DOM.usernameDisplay.textContent = user.nickname; DOM.profilePicture.src = user.profilePictureUrl || DEFAULT_PROFILE_PICTURE; loadFriends(); listenToRoomUpdates(); listenToPresenceUpdates(); fetchUnreadCounts(); }).catch(error => { console.error("Failed to fetch user details:", error); showAuthScreen(); });
 }
-async function showChatScreen(roomId, roomName) {
+async function showChatScreen(roomId, roomName, announcement) {
+    if (currentRoomId !== roomId) {
+        isAnnouncementManuallyHidden = false;
+    }
     currentRoomId = roomId;
     DOM.mainScreen.classList.add('hidden');
     DOM.chatScreen.classList.remove('hidden');
 
     const room = findRoomById(roomId);
+    updateAnnouncementBar(announcement);
     let displayRoomName = roomName; // 기본값은 클릭한 목록의 이름
+
+    if (currentUser && currentRoomId) {
+        fetch('/api/unread/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: currentUser, // 현재 로그인한 사용자 ID
+                roomId: currentRoomId  // 현재 입장한 채팅방 ID
+            })
+        }).catch(error => {
+            console.error('읽음 처리 API 호출 중 오류 발생:', error);
+        });
+    }
 
     // ✅ 이름 표시 로직 수정
     if (room && room.name.includes('&')) {
@@ -491,7 +630,6 @@ async function showChatScreen(roomId, roomName) {
         DOM.chatRoomProfileHeader.src = DEFAULT_PROFILE_PICTURE;
     }
 
-    // --- (이하 버튼 생성 및 나머지 코드는 그대로 유지) ---
     const header = DOM.chatHeaderInfo.parentElement;
     const existingButtons = header.querySelector('.chat-header-buttons');
     if (existingButtons) { header.removeChild(existingButtons); }
@@ -537,17 +675,40 @@ function findRoomById(roomId) {
     return currentRoomList.find(r => r.id === roomId);
 }
 
-    async function loadFriends() {
+async function loadFriends() {
     try {
-    const response = await fetch(`/api/friends/${currentUser}`); const friends = await response.json();
-    const onlineFriendsResponse = await fetch(`/api/presence/${currentUser}/friends/online`); const onlineFriendUsernames = await onlineFriendsResponse.json();
-    DOM.friendList.innerHTML = '';
-    friends.forEach(friend => {
-    const isOnline = onlineFriendUsernames.includes(friend.username); const li = document.createElement('li');
-    li.innerHTML = ` <div class="friend-info"> <div class="friend-avatar-container"> <img src="${friend.profilePictureUrl || DEFAULT_PROFILE_PICTURE}" class="friend-avatar" alt="Friend Avatar"> <span class="status-circle ${isOnline ? 'online' : ''}" data-username="${friend.username}"></span> </div> <span>${friend.nickname}</span> </div> <button class="button">${translations.dmButton[currentLanguage]}</button> `;
-    li.querySelector('button').addEventListener('click', () => startDM(friend.username)); DOM.friendList.appendChild(li);
-});
-} catch (error) { console.error('친구 목록 로딩 실패:', error); }
+        const response = await fetch(`/api/friends/${currentUser}`);
+        const friends = await response.json();
+        const onlineFriendsResponse = await fetch(`/api/presence/${currentUser}/friends/online`);
+        const onlineFriendUsernames = await onlineFriendsResponse.json();
+        // [핵심] API 응답을 전역 캐시에 저장
+        allFriendsCache = friends;
+        onlineFriendsCache = new Set(onlineFriendUsernames);
+        // [핵심] 렌더링 함수를 호출하여 전체 목록을 그림
+        renderFriendList(allFriendsCache);
+    } catch (error) {console.error('친구 목록 로딩 실패:', error);
+    }
+}
+function renderFriendList(friendsToRender) {
+    DOM.friendList.innerHTML = ''; // 목록 비우기
+    friendsToRender.sort(sortFriends);
+    // 목록 생성
+    friendsToRender.forEach(friend => {
+        const isOnline = onlineFriendsCache.has(friend.username); // 캐시에서 온라인 상태 확인
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <div class="friend-info">
+                <div class="friend-avatar-container">
+                    <img src="${friend.profilePictureUrl || DEFAULT_PROFILE_PICTURE}" class="friend-avatar" alt="Friend Avatar">
+                    <span class="status-circle ${isOnline ? 'online' : ''}" data-username="${friend.username}"></span>
+                </div>
+                <span>${friend.nickname}</span>
+            </div>
+            <button class="button">${translations.dmButton[currentLanguage]}</button>
+        `;
+        li.querySelector('button').addEventListener('click', () => startDM(friend.username));
+        DOM.friendList.appendChild(li);
+    });
 }
     async function startDM(friendUsername) {
     try {
@@ -640,9 +801,17 @@ function listenToRoomUpdates() {
                         </div>
                     `;
 
-                    li.addEventListener('click', () => showChatScreen(room.id, roomDisplayName));
+                    li.addEventListener('click', () => showChatScreen(room.id, roomDisplayName, room.announcement));
                     DOM.roomList.appendChild(li);
                 });
+                if (currentRoomId) {
+                    const activeRoom = rooms.find(r => r.id === currentRoomId);
+                    if (activeRoom) {
+                        // updateAnnouncementBar 함수를 호출해
+                        // 현재 채팅방의 공지 바를 즉시 갱신합니다.
+                        updateAnnouncementBar(activeRoom.announcement);
+                    }
+                }
                 applyChatRoomFilter();
 
             }
@@ -747,7 +916,6 @@ function sendMessage() {
 
     if (message === '') return; // 비어있는 메시지는 보내지 않음
 
-    // 2. ✨ [핵심 수정] payload 객체에 'replyToMessageId'를 추가합니다.
     const payload = {
         type: 'MESSAGE',
         nickname: currentUserNickname,
@@ -761,7 +929,7 @@ function sendMessage() {
         websocket.send(JSON.stringify(payload));
     }
 
-    // 4. 입력창을 비우고, ✨ [핵심 수정] 답장 상태를 초기화합니다.
+    // 4. 입력창을 비우고, 답장 상태를 초기화합니다.
     DOM.messageInput.value = '';
     cancelReply(); // 답장 바를 숨기고 ID를 초기화하는 함수 호출
 
@@ -825,13 +993,24 @@ async function loadPreviousMessages() {
 });
 } catch (error) { console.error("Failed to fetch unread counts:", error); }
 }
-    async function resetUnreadCount(roomId) {
-    if (!currentUser || !roomId) return;
+async function resetUnreadCount(roomId) {
+    if (!currentUser || !roomId) {
+        console.error("resetUnreadCount: currentUser 또는 roomId가 null입니다.");
+        return;
+    }
     try {
-    await fetch('/api/unread/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: currentUser, roomId: roomId }), });
-    const badge = document.querySelector(`.unread-badge[data-room-id="${roomId}"]`);
-    if (badge) { badge.textContent = '0'; badge.classList.add('hidden'); }
-} catch (error) { console.error("Failed to reset unread count:", error); }
+        const response = await fetch('/api/unread/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser, roomId: roomId }),
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("안 읽음 처리 API 실패:", response.status, errorText);
+        }
+    } catch (error) {
+        console.error("Failed to reset unread count:", error);
+    }
 }
 
 function displayMessage(msg, parentElement = DOM.chatWindow) {
@@ -925,7 +1104,16 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
             const optionsPopup = document.createElement('div'); optionsPopup.className = 'menu-options-popup hidden'; optionsPopup.id = `options-${id}`;
             const editIcon = document.createElement('span'); editIcon.className = 'menu-option-icon'; editIcon.innerHTML = '✏️'; editIcon.onclick = () => showEditInput(id, messageBubble);
             const deleteIcon = document.createElement('span'); deleteIcon.className = 'menu-option-icon'; deleteIcon.innerHTML = '🗑️'; deleteIcon.onclick = () => sendDeleteMessage(id);
-            optionsPopup.appendChild(editIcon); optionsPopup.appendChild(deleteIcon); menuContainer.appendChild(gearIcon); menuContainer.appendChild(optionsPopup);
+            optionsPopup.appendChild(editIcon); optionsPopup.appendChild(deleteIcon);
+            if (msg.messageType === 'TEXT' || msg.messageType === 'FILE' || msg.messageType === 'IMAGE') {
+                const announceIcon = document.createElement('span');
+                announceIcon.className = 'menu-option-icon';
+                announceIcon.innerHTML = '📢';
+                announceIcon.title = '이 글을 공지로';
+                announceIcon.onclick = () => openAnnounceConfirmModal(msg);
+                optionsPopup.appendChild(announceIcon);
+            }
+            menuContainer.appendChild(gearIcon); menuContainer.appendChild(optionsPopup);
             bubbleWrapper.appendChild(menuContainer);
         }
         bubbleWrapper.appendChild(metaContainer);
@@ -972,6 +1160,14 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
             // 번역된 내용이 있을 경우에만 버튼을 추가
             if (msg.translations && Object.keys(msg.translations).length > 0) {
                 optionsPopup.appendChild(translateIcon);
+            }
+            if (msg.messageType === 'TEXT' || msg.messageType === 'FILE' || msg.messageType === 'IMAGE') {
+                const announceIcon = document.createElement('span');
+                announceIcon.className = 'menu-option-icon';
+                announceIcon.innerHTML = '📢';
+                announceIcon.title = '이 글을 공지로';
+                announceIcon.onclick = () => openAnnounceConfirmModal(msg);
+                optionsPopup.appendChild(announceIcon);
             }
 
             menuContainer.appendChild(gearIcon);
@@ -1455,4 +1651,104 @@ function applyChatRoomFilter() {
             room.style.display = '';
         }
     });
+}
+//공지
+function openAnnounceConfirmModal(message) {
+    if (currentRoomAnnouncement) {
+        alert("공지는 하나씩만 게시 가능합니다.\n기존 공지를 먼저 내려주세요.");
+        return;
+    }
+
+    // 공지할 내용을 전역 변수에 임시 저장
+    let content = message.content;
+    if (message.messageType === 'IMAGE') {
+        content = "[이미지] " + (message.fileUrl ? message.fileUrl.split('/').pop() : 'Image');
+    } else if (message.messageType === 'FILE') {
+        content = "[파일] " + content; // 파일은 content에 파일명이 있음
+    }
+    messageToAnnounce = content; // '게시하기' 버튼이 누를 수 있도록 저장
+
+    // 모달의 인용구(blockquote)에 내용 채우기
+    DOM.announceConfirmContent.textContent = content;
+    // 모달 보여주기
+    DOM.announceConfirmOverlay.classList.remove('hidden');
+}
+
+//공지 확인 모달 닫기
+function closeAnnounceConfirmModal() {
+    DOM.announceConfirmOverlay.classList.add('hidden');
+    messageToAnnounce = null; // 임시 변수 비우기
+}
+
+//'게시하기' 버튼 클릭 시 (WebSocket으로 전송)
+function postAnnouncement() {
+    if (websocket && websocket.readyState === WebSocket.OPEN && messageToAnnounce) {
+        // 2단계(백엔드)에서 정의한 "UPDATE_ANNOUNCEMENT" 타입으로 메시지 전송
+        websocket.send(JSON.stringify({
+            type: "UPDATE_ANNOUNCEMENT",
+            message: messageToAnnounce // 임시 저장했던 메시지 내용을 전송
+        }));
+    }
+    // 전송 후 모달 닫기
+    closeAnnounceConfirmModal();
+}
+
+//'공지 내리기 (x)' 버튼 클릭 시
+function removeAnnouncement() {
+    if (!confirm("공지를 내리시겠습니까?")) {
+        return;
+    }
+
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+        // 백엔드로 message: null 을 보내 공지 삭제를 요청
+        websocket.send(JSON.stringify({
+            type: "UPDATE_ANNOUNCEMENT",
+            message: null
+        }));
+    }
+}
+
+//공지 바 UI
+function updateAnnouncementBar(content) {
+    // 1. 공지 내용이 이전에 기억한 내용과 다르면 (예: 새 공지 등록/삭제)
+    //    '수동 숨김' 상태를 강제로 해제합니다.
+    if (currentRoomAnnouncement !== content) {
+        isAnnouncementManuallyHidden = false;
+    }
+
+    currentRoomAnnouncement = content; // 새 공지 내용 기억
+
+    if (content) {
+        // 2. 공지가 있는 경우
+        DOM.announcementContent.textContent = content;
+
+        if (isAnnouncementManuallyHidden) {
+            // 2-1. (공지가 있지만) 수동으로 숨긴 상태: 바(Bar) 숨김, 이모지(📢) 표시
+            DOM.announcementBar.classList.add('hidden');
+            DOM.showAnnouncementBtn.classList.remove('hidden');
+        } else {
+            // 2-2. (공지가 있고) 일반 상태: 바(Bar) 표시, 이모지(📢) 숨김
+            DOM.announcementBar.classList.remove('hidden');
+            DOM.showAnnouncementBtn.classList.add('hidden');
+        }
+
+    } else {
+        // 3. 공지가 없는 경우 (null)
+        //    둘 다 숨기고, 상태도 초기화합니다.
+        DOM.announcementBar.classList.add('hidden');
+        DOM.showAnnouncementBtn.classList.add('hidden');
+        isAnnouncementManuallyHidden = false;
+    }
+}
+
+function hideAnnouncementBar() {
+    DOM.announcementBar.classList.add('hidden');
+    DOM.showAnnouncementBtn.classList.remove('hidden');
+    isAnnouncementManuallyHidden = true; // '수동 숨김' 상태로 기억
+}
+
+function showAnnouncementBar() {
+    DOM.announcementBar.classList.remove('hidden');
+    DOM.showAnnouncementBtn.classList.add('hidden');
+    isAnnouncementManuallyHidden = false; // '수동 숨김' 상태 해제
 }

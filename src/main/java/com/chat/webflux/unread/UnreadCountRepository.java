@@ -6,6 +6,7 @@ import reactor.core.publisher.Mono;
 
 public interface UnreadCountRepository extends ReactiveMongoRepository<UnreadCount, String> {
     Flux<UnreadCount> findByUserId(String userId);
-    Mono<UnreadCount> findByUserIdAndRoomId(String userId, String roomId);
+    Flux<UnreadCount> findByUserIdAndRoomId(String userId, String roomId);
+
     Mono<Void> deleteByRoomId(String roomId);
 }

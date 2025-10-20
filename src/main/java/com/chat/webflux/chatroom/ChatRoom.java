@@ -23,6 +23,7 @@ public class ChatRoom {
     private String createdBy;
     private LocalDateTime createdAt;
     private Set<String> members = new HashSet<>();
+    private String announcement;
 
     // 그룹 채팅방 생성을 위한 생성자
     public ChatRoom(String name, String createdBy) {

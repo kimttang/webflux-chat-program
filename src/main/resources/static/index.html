@@ -43,11 +43,19 @@
                     <img id="profile-picture" src="" alt="Profile Picture">
                     <span id="username-display"></span>
                 </div>
-                <div class="filter-buttons hidden">
-                    <button id="show-all-chats-button" class="filter-button active">전체</button>
-                    <button id="show-unread-chats-button" class="filter-button">안읽음</button>
+                <div class="header-icons-right">
+                    <input type="text" id="friend-search-input" class="search-input hidden" placeholder="닉네임으로 검색...">
+                    <div id="default-header-icons" class="icon-group">
+                        <div id="chat-filter-buttons" class="filter-buttons hidden">
+                            <button id="show-all-chats-button" class="filter-button active">전체</button>
+                            <button id="show-unread-chats-button" class="filter-button">안읽음</button>
+                        </div>
+                        <button id="show-friend-search-button" class="icon-button">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <button id="logout-button"></button>
                 </div>
-                <button id="logout-button"></button>
             </div>
             <div class="sidebar-body">
                 <ul id="friend-list" class="friend-list"></ul>
@@ -74,9 +82,15 @@
                 <img id="chat-room-profile-header" src="" alt="Room Profile" class="header-profile-pic">
                 <span id="chat-room-name-header"></span>
             </div>
+            <button id="show-announcement-btn" class="icon-button hidden" title="공지 보기">📢</button>
             <span id="search-icon">🔍</span>
         </div>
-
+        <div id="announcement-bar" class="announcement-bar hidden">
+            <i class="fas fa-bullhorn"></i>
+            <span id="announcement-content"></span>
+            <button id="hide-announcement-btn" title="공지 숨기기"><i class="fas fa-chevron-down"></i></button>
+            <button id="remove-announcement-btn" title="공지 내리기">&times;</button>
+        </div>
         <div id="search-bar" class="search-bar hidden">
             <input type="text" id="search-input" placeholder="메시지 검색...">
 
@@ -155,6 +169,22 @@
                 <button id="room-edit-cancel-button" class="button">취소</button>
                 <button id="room-edit-save-button" class="button">저장</button>
             </div>
+        </div>
+    </div>
+</div>
+<div id="announce-confirm-overlay" class="modal-overlay hidden">
+    <div id="announce-confirm-modal" class="modal">
+        <div class="modal-header">
+            <h2>공지 등록 확인</h2>
+            <button id="close-announce-confirm-modal" class="close-modal-button">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>이 메시지를 공지로 등록하시겠습니까?</p>
+            <blockquote id="announce-confirm-content"></blockquote>
+        </div>
+        <div class="modal-buttons">
+            <button id="announce-confirm-cancel" class="button button-secondary">취소</button>
+            <button id="announce-confirm-post" class="button">게시하기</button>
         </div>
     </div>
 </div>

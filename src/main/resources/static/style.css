@@ -38,7 +38,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .message-time { font-size: 0.75em; color: var(--gray-color); text-align: right; }
 .system-message { text-align: center; color: var(--gray-color); font-size: 12px; margin: 10px 0; }
 .sidebar { width: 100%; padding: 0; display: flex; flex-direction: column; height: 100%; }
-.sidebar-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+.sidebar-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; position: relative;}
 .user-profile { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 #profile-picture { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background-color: #eee; }
 #username-display { font-size: 16px; font-weight: bold; }
@@ -70,7 +70,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .chat-file-link span { margin-left: 8px; }
 .language-selector-container { padding: 0 25px 15px; text-align: right; }
 #language-selector-auth { padding: 5px; border-radius: 5px; border: 1px solid #ddd; }
-#logout-button { padding: 5px 10px; font-size: 12px; width: auto; background-color: #f1f1f1; color: #333; border: 1px solid #ddd; }
+#logout-button { padding: 5px 10px; font-size: 12px; width: auto; background-color: #f1f1f1; color: #333; border: 1px solid #ddd; flex-shrink: 0;}
 #logout-button:hover { background-color: #e1e1e1; }
 #profile-edit-preview { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; }
 #profile-edit-picture-button, #room-edit-picture-button { width: 120px; padding: 8px; font-size: 14px; background-color: #f0f0f0; color: #333; border: 1px solid #ccc; }
@@ -734,4 +734,119 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     color: white; /* 흰색 글씨 */
     font-weight: 600; /* 더 굵게 */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 입체감을 주는 그림자 효과 */
+}
+.header-icons-right {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px; /* 아이콘 사이 간격 */
+    justify-content: flex-end;
+}
+#friend-search-input.search-input {
+    border: 1px solid #ddd;
+    border-radius: 15px;
+    padding: 6px 12px;
+    font-size: 0.9em;
+    outline: none;
+    box-sizing: border-box;
+    height: 32px; /* 헤더보다 작은 고정 높이 (조정 가능) */
+    width: 100%;  /* 부모(header-icons-right)의 너비를 채움 */
+    flex-grow: 1;
+}
+/* [핵심] JS가 .hidden 클래스를 제거했을 때 (검색창 보이기) */
+#friend-search-input.search-input:not(.hidden) {
+    opacity: 1;
+    pointer-events: auto; /* 클릭 가능하게 */
+}
+.header-icons-right .icon-group {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* 기존 header-icons-right의 gap과 동일하게 */
+}
+/* ===== [추가] 공지 바 스타일 ===== */
+.announcement-bar {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 10px 15px;
+    display: flex; /* 가로 정렬 */
+    justify-content: space-between; /* 양쪽 끝으로 정렬 */
+    align-items: center; /* 세로 중앙 정렬 */
+    font-size: 14px;
+    color: #343a40;
+    line-height: 1.4;
+}
+
+.announcement-bar i.fa-bullhorn {
+    margin-right: 10px;
+    color: var(--main-color);
+}
+
+/* 공지 내용 (아이콘과 텍스트) */
+.announcement-bar span {
+    flex-grow: 1; /* 남은 공간을 모두 차지 */
+    margin-right: 10px; /* 삭제 버튼과의 간격 */
+}
+
+/* 공지 내리기(x) 버튼 */
+#remove-announcement-btn {
+    background: none;
+    border: none;
+    font-size: 22px; /* 'x' 크기 키우기 */
+    color: #888;
+    cursor: pointer;
+    padding: 0 5px;
+    line-height: 1;
+}
+#remove-announcement-btn:hover {
+    color: #333;
+}
+
+
+/* ===== [추가] 공지 확인 모달 (인용구) ===== */
+#announce-confirm-content {
+    background-color: #f9f9f9;
+    border-left: 4px solid #ccc;
+    margin: 15px 0;
+    padding: 10px 15px;
+    font-style: italic;
+    color: #555;
+    white-space: pre-wrap; /* 줄바꿈 유지 */
+    word-break: break-all; /* 긴 단어 줄바꿈 */
+    max-height: 100px; /* 너무 길면 잘리도록 */
+    overflow-y: auto;
+}
+
+/* 범용 보조 버튼 (지난번과 동일) */
+.button-secondary {
+    background-color: #f1f3f5;
+    color: #333;
+    border: 1px solid #dee2e6;
+}
+.button-secondary:hover {
+    background-color: #e9ecef;
+}
+/* 1. 공지 바 내부 '숨기기' 버튼(v) 스타일 */
+#hide-announcement-btn {
+    background: none;
+    border: none;
+    font-size: 16px; /* 아이콘 크기 */
+    color: #888;
+    cursor: pointer;
+    padding: 0 5px;
+    line-height: 1;
+    margin-left: auto; /* (중요) 자동으로 오른쪽 정렬 */
+}
+#hide-announcement-btn:hover { color: #333; }
+
+/* 2. 기존 '공지 내리기(x)' 버튼은 자동 정렬을 끕니다 */
+#remove-announcement-btn {
+    margin-left: 0; /* '숨기기' 버튼 오른쪽에 붙도록 */
+}
+
+/* 3. 헤더의 '공지 보이기' 버튼 스타일 */
+#show-announcement-btn {
+    margin-left: auto; /* (중요) 자동으로 오른쪽 정렬 */
+    font-size: 1.1rem; /* 이모지 폰트 크기 */
+    padding-right: 8px; /* 검색 아이콘과의 간격 */
+    color: var(--main-color);
 }

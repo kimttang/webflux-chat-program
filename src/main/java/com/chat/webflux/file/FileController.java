@@ -6,6 +6,10 @@ import com.chat.webflux.handler.ChatWebSocketHandler;
 import com.chat.webflux.message.ChatMessage;
 import com.chat.webflux.message.ChatMessageRepository;
 import com.chat.webflux.user.UserRepository;
+import com.chat.webflux.chatroom.ChatRoomRepository;
+import com.chat.webflux.chatroom.ChatRoomService;
+import com.chat.webflux.unread.UnreadCountService;
+import reactor.core.publisher.Flux;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +36,9 @@ public class FileController {
 
     // 닉네임을 찾기 위해 UserRepository 의존성 주입
     private final UserRepository userRepository;
+    private final ChatRoomRepository chatRoomRepository;
+    private final UnreadCountService unreadCountService;
+    private final ChatRoomService chatRoomService;
 
     @Value("${file.upload-dir}")
     private String uploadDir;
@@ -72,9 +79,24 @@ public class FileController {
                                     userRepository.findByUsername(savedMessage.getSender())
                                             .map(user -> new ChatMessageDto(savedMessage, user))
                             )
-                            .doOnSuccess(chatMessageDto -> {
+                            .flatMap(chatMessageDto -> {
                                 OutgoingMessage outgoingMessage = OutgoingMessage.forChatMessage(chatMessageDto);
                                 chatWebSocketHandler.broadcastMessage(roomId, outgoingMessage);
+                                return chatRoomRepository.findById(roomId)
+                                        .flatMap(chatRoom ->
+                                                Flux.fromIterable(chatRoom.getMembers())
+                                                        // 5. 핸들러의 public 메서드 사용
+                                                        .filter(member -> !member.equals(sender) && !chatWebSocketHandler.isUserPresent(roomId, member))
+                                                        .flatMap(member -> unreadCountService.incrementUnreadCount(member, roomId))
+                                                        .then(Mono.just(chatRoom))
+                                        )
+                                        .doOnSuccess(chatRoom -> {
+                                            // 6. [핵심] 채팅방 목록(SSE) 갱신
+                                            if (chatRoom != null) {
+                                                chatRoomService.broadcastToAllMembers(chatRoom);
+                                            }
+                                        })
+                                        .then(); // Mono<Void> 반환
                             })
                             .then();
                 })

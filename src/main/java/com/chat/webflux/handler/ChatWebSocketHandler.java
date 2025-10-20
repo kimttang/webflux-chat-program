@@ -9,6 +9,7 @@ import com.chat.webflux.unread.UnreadCountService;
 import com.chat.webflux.user.User;
 import com.chat.webflux.user.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chat.webflux.chatroom.ChatRoomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -41,6 +42,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     private final WebClient webClient = WebClient.create();
     private final PresenceService presenceService;
     private final UnreadCountService unreadCountService;
+    private final ChatRoomService chatRoomService;
 
 
     @Override
@@ -57,22 +59,40 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 
                     sessions.computeIfAbsent(roomId, key -> ConcurrentHashMap.newKeySet()).add(session);
                     presenceService.userOnline(username);
-                    unreadCountService.resetUnreadCount(username, roomId);
 
-                    return session.receive()
-                            .flatMap(message -> handleMessage(session, message.getPayloadAsText()))
-                            .doOnError(e -> log.error("Error in WebSocket handling for room {}: {}", roomId, e.getMessage()))
-                            .doFinally(signalType -> {
-                                sessions.get(roomId).remove(session);
-                                if (sessions.get(roomId).isEmpty()) {
-                                    sessions.remove(roomId);
+                    // [수정] 1. DB 리셋 Mono를 정의
+                    Mono<Void> resetDbMono = unreadCountService.resetUnreadCount(username, roomId);
+
+                    // [수정] 2. SSE 방송 Mono를 별도로 정의 (UnreadCountController의 방식 차용)
+                    Mono<Void> broadcastSseMono = Mono.fromRunnable(() -> {
+                                try {
+                                    chatRoomService.broadcastRoomListToUser(username);
+                                } catch (Exception e) {
+                                    log.error("SSE 브로드캐스트 실패 (handle). userId: {}. Error: {}", username, e.getMessage(), e);
                                 }
-                                if (!isUserPresentInAnyRoom(username)) {
-                                    presenceService.userOffline(username);
-                                }
-                                log.info("Session closed for user {} in room {}. Signal: {}", username, roomId, signalType);
                             })
+                            .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()) // 별도 스레드에서 실행
                             .then();
+
+                    // [수정] 3. DB 리셋 -> SSE 방송 -> 메시지 수신 순서로 체인을 명확히 연결
+                    return resetDbMono
+                            .then(broadcastSseMono) // DB 리셋이 끝나면 SSE 방송
+                            .then( // SSE 방송까지 끝나면 메시지 수신 시작
+                                    session.receive()
+                                            .flatMap(message -> handleMessage(session, message.getPayloadAsText()))
+                                            .doOnError(e -> log.error("Error in WebSocket handling for room {}: {}", roomId, e.getMessage()))
+                                            .doFinally(signalType -> {
+                                                sessions.get(roomId).remove(session);
+                                                if (sessions.get(roomId).isEmpty()) {
+                                                    sessions.remove(roomId);
+                                                }
+                                                if (!isUserPresentInAnyRoom(username)) {
+                                                    presenceService.userOffline(username);
+                                                }
+                                                log.info("Session closed for user {} in room {}. Signal: {}", username, roomId, signalType);
+                                            })
+                                            .then()
+                            );
                 })
                 .doOnError(e -> log.error("Error processing WebSocket connection: {}", e.getMessage()))
                 .then();
@@ -99,6 +119,8 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                     return handleDeleteMessage(incomingMessage, username, roomId);
                 case "MESSAGES_READ":
                     return handleMessagesRead(incomingMessage, username, roomId);
+                case "UPDATE_ANNOUNCEMENT":
+                    return handleUpdateAnnouncement(session, incomingMessage.getMessage());
                 default:
                     return Mono.empty();
             }
@@ -112,44 +134,58 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     private Mono<Void> handleMessagesRead(IncomingMessage incomingMessage, String readerUsername, String roomId) {
         List<String> messageIds = incomingMessage.getMessageIds();
         if (messageIds == null || messageIds.isEmpty()) {
-            return Mono.empty();
+            return Mono.empty(); // [수정] 아무것도 안 함 -> DB 리셋 및 SSE 방송 로직 추가
         }
 
-        // 1. 현재 채팅방의 총 멤버 수를 가져옵니다.
-        return chatRoomRepository.findById(roomId)
+        // [기존 로직] 개별 메시지 '읽음'(readBy) 처리
+        Mono<Void> updateReadByMono = chatRoomRepository.findById(roomId)
                 .flatMap(chatRoom -> {
                     int totalMembers = chatRoom.getMembers().size();
 
-                    // 2. 읽음 처리할 메시지 ID 목록을 순회하며 비동기 처리합니다.
                     return Flux.fromIterable(messageIds)
                             .flatMap(messageId -> chatMessageRepository.findById(messageId)
                                     .flatMap(message -> {
-                                        // 3. 메시지를 읽은 사용자 목록에 현재 사용자를 추가합니다.
-                                        //    Set.add()는 실제로 값이 추가되었을 때 true를 반환합니다.
                                         boolean changed = message.getReadBy().add(readerUsername);
 
-                                        // 4. 읽음 상태에 변화가 있을 경우에만 DB에 저장하고 모든 클라이언트에게 알립니다.
                                         if (changed) {
                                             return chatMessageRepository.save(message)
                                                     .doOnSuccess(savedMessage -> {
                                                         int unreadCount = totalMembers - savedMessage.getReadBy().size();
                                                         if (unreadCount < 0) unreadCount = 0;
 
-                                                        // 5. '읽음 확인 업데이트' 이벤트를 생성하여 브로드캐스트합니다.
                                                         OutgoingMessage readUpdate = OutgoingMessage.forReadReceiptUpdate(
                                                                 savedMessage.getId(),
                                                                 savedMessage.getReadBy(),
                                                                 unreadCount
                                                         );
-                                                        broadcastMessage(roomId, readUpdate); // 모든 클라이언트에게 전송
+                                                        broadcastMessage(roomId, readUpdate);
                                                     });
                                         }
                                         return Mono.empty();
                                     }))
                             .then();
                 });
-    }
 
+        // [수정] 1. (handle 메서드와 동일) DB 리셋 Mono를 정의
+        Mono<Void> resetDbMono = unreadCountService.resetUnreadCount(readerUsername, roomId);
+
+        // [수정] 2. (handle 메서드와 동일) SSE 방송 Mono를 별도로 정의
+        Mono<Void> broadcastSseMono = Mono.fromRunnable(() -> {
+                    try {
+                        chatRoomService.broadcastRoomListToUser(readerUsername);
+                    } catch (Exception e) {
+                        log.error("SSE 브로드캐스트 실패 (handleMessagesRead). userId: {}. Error: {}", readerUsername, e.getMessage(), e);
+                    }
+                })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()) // 별도 스레드
+                .then();
+
+
+        // [수정] 3. 모든 Mono를 순서대로 연결
+        return updateReadByMono
+                .then(resetDbMono)
+                .then(broadcastSseMono);
+    }
 
     private Mono<Void> handleNewMessage(IncomingMessage incomingMessage, String username, String roomId) {
         ChatMessage chatMessage = new ChatMessage(roomId, username, incomingMessage.getMessage());
@@ -170,15 +206,32 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                                                 unreadCountService.incrementUnreadCount(member, roomId).subscribe();
                                             }
                                         });
+                                        chatRoomService.broadcastToAllMembers(chatRoom);
                                     });
 
                                     if (incomingMessage.getTargetLang() != null && !incomingMessage.getTargetLang().isEmpty()) {
                                         translateMessage(savedMessage.getId(), incomingMessage.getMessage(), incomingMessage.getTargetLang(), username)
                                                 .subscribe();
                                     }
-                                    return Mono.empty();
+                                    return chatRoomRepository.findById(roomId)
+                                            .flatMap(chatRoom ->
+                                                    Flux.fromIterable(chatRoom.getMembers())
+                                                            // 접속 안 한 다른 멤버 필터링
+                                                            .filter(member -> !member.equals(username) && !isUserPresent(roomId, member))
+                                                            // [기능 누락 수정] 안 읽음 카운트 증가
+                                                            .flatMap(member -> unreadCountService.incrementUnreadCount(member, roomId))
+                                                            .then(Mono.just(chatRoom))
+                                            )
+                                            .doOnSuccess(chatRoom -> {
+                                                if (chatRoom != null) {
+                                                    // [기능 누락 수정] 목록 갱신 트리거
+                                                    chatRoomService.broadcastToAllMembers(chatRoom);
+                                                }
+                                            });
                                 })
-                ).then();
+                ).then(); // Mono<Void> 반환
+
+
     }
     private Mono<ChatMessageDto> createChatMessageDtoWithReplyInfo(ChatMessage message, User sender) {
         ChatMessageDto dto = new ChatMessageDto(message, sender);
@@ -326,7 +379,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         String[] lines = cleanedContent.split("\\n");
         return lines.length > 0 ? lines[0].trim() : cleanedContent;
     }
-    private boolean isUserPresent(String roomId, String username) {
+    public boolean isUserPresent(String roomId, String username) {
         Set<WebSocketSession> roomSessions = sessions.get(roomId);
         if (roomSessions == null) return false;
         return roomSessions.stream().anyMatch(s -> username.equals(getUsernameFromUri(s)));
@@ -347,5 +400,19 @@ public class ChatWebSocketHandler implements WebSocketHandler {
             return null;
         }
     }
-
+    private Mono<Void> handleUpdateAnnouncement(WebSocketSession session, String content) {
+        String roomId = getRoomId(session);
+        // 1. DB에서 채팅방을 찾습니다.
+        return chatRoomRepository.findById(roomId)
+                .flatMap(room -> {
+                    // 2. 채팅방의 공지 내용을 업데이트합니다. (내용이 비어있으면 null로 저장 = 공지 삭제)
+                    room.setAnnouncement(content != null && !content.isEmpty() ? content : null);
+                    // 3. DB에 저장합니다.
+                    return chatRoomRepository.save(room);
+                })
+                .doOnSuccess(savedRoom -> {
+                    chatRoomService.broadcastToAllMembers(savedRoom);
+                })
+                .then(); // Mono<Void> 반환
+    }
 }
