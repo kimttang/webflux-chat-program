@@ -579,7 +579,21 @@ function changeLanguage(lang) {
     DOM.authScreen.classList.add('hidden');
     DOM.mainScreen.classList.remove('hidden');
     DOM.chatScreen.classList.add('hidden');
-    fetch(`/api/users/${currentUser}/details`).then(response => response.ok ? response.json() : Promise.reject('User not found')).then(user => { currentUser = user.username; currentUserNickname = user.nickname; DOM.usernameDisplay.textContent = user.nickname; DOM.profilePicture.src = user.profilePictureUrl || DEFAULT_PROFILE_PICTURE; loadFriends(); listenToRoomUpdates(); listenToPresenceUpdates(); fetchUnreadCounts(); }).catch(error => { console.error("Failed to fetch user details:", error); showAuthScreen(); });
+    fetch(`/api/users/${currentUser}/details`)
+        .then(response => response.ok ? response.json() : Promise.reject('User not found'))
+        .then(user => {
+            currentUser = user.username;
+            currentUserNickname = user.nickname;
+            DOM.usernameDisplay.textContent = user.nickname;
+            DOM.profilePicture.src = user.profilePictureUrl || DEFAULT_PROFILE_PICTURE;
+            loadFriends();
+            listenToRoomUpdates();
+            listenToPresenceUpdates();
+            fetchUnreadCounts();
+        })
+        .catch(error => { console.error("Failed to fetch user details:", error);
+            showAuthScreen();
+        });
 }
 async function showChatScreen(roomId, roomName, announcement) {
     if (currentRoomId !== roomId) {

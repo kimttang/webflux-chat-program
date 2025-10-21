@@ -1,7 +1,8 @@
 spring:
   data:
     mongodb:
-      uri: mongodb://localhost:27017/chatdb # 로컬 MongoDB 주소 및 DB 이름
+      uri: mongodb+srv://kimttang:admin@project-chat.aara4rr.mongodb.net/chat?retryWrites=true&w=majority&appName=project-chat
+      #MongoDB 주소 및 DB 이름
 
 file:
   upload-dir: ./uploads # 프로젝트 루트 폴더 아래에 uploads 폴더를 사용
