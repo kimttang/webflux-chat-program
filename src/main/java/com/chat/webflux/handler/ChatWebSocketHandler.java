@@ -1,7 +1,8 @@
 package com.chat.webflux.handler;
 
+import com.chat.webflux.calendar.CalendarEvent;
+import com.chat.webflux.calendar.CalendarEventRepository;
 import com.chat.webflux.chatroom.ChatRoomRepository;
-import com.chat.webflux.chatroom.ChatRoomService;
 import com.chat.webflux.dto.*;
 import com.chat.webflux.message.ChatMessage;
 import com.chat.webflux.message.ChatMessageRepository;
@@ -10,6 +11,12 @@ import com.chat.webflux.unread.UnreadCountService;
 import com.chat.webflux.user.User;
 import com.chat.webflux.user.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chat.webflux.chatroom.ChatRoomService;
+import com.chat.webflux.chatroom.ChatRoom;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -43,6 +50,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     private final PresenceService presenceService;
     private final UnreadCountService unreadCountService;
     private final ChatRoomService chatRoomService;
+    private final CalendarEventRepository calendarEventRepository;
 
 
     @Override
@@ -106,7 +114,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 
             switch (incomingMessage.getType()) {
                 case "MESSAGE":
-                    return handleNewMessage(incomingMessage, username, roomId);
+                    return handleNewMessage(session, incomingMessage, username, roomId);
                 case "TYPING_START":
                     broadcastMessage(roomId, OutgoingMessage.forEvent("TYPING_START", incomingMessage.getNickname(), null), session);
                     return Mono.empty();
@@ -187,8 +195,26 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 .then(broadcastSseMono);
     }
 
-    private Mono<Void> handleNewMessage(IncomingMessage incomingMessage, String username, String roomId) {
-        ChatMessage chatMessage = new ChatMessage(roomId, username, incomingMessage.getMessage());
+    private Mono<Void> handleNewMessage(WebSocketSession session, IncomingMessage incomingMessage, String username, String roomId) {
+        String content = incomingMessage.getMessage();
+        // [신규 로직] @바브봇 명령어 감지
+
+        if (content != null && content.startsWith("@바브봇")) {
+            if (content.contains("요약") || content.contains("summarize")) {
+                // "요약" 명령어가 포함된 경우, 요약 핸들러로 처리를 넘깁니다.
+                return handleSummaryCommand(session, roomId, username); // [수정] session을 사용합니다.
+            } else {
+                log.warn("Unknown AI Bot command received: {}", content);
+                return Mono.empty(); // 메시지 저장/전송 안 함
+            }
+        }
+
+        if (content != null && content.startsWith("!일정 ")) {
+            String commandText = content.substring(4).trim();
+            return processScheduleCommand(commandText);
+        }
+
+        ChatMessage chatMessage = new ChatMessage(roomId, username,content);
         if (incomingMessage.getReplyToMessageId() != null && !incomingMessage.getReplyToMessageId().isEmpty()) {
             chatMessage.setReplyToMessageId(incomingMessage.getReplyToMessageId());
         }
@@ -232,6 +258,100 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 ).then(); // Mono<Void> 반환
 
 
+    }
+    /**
+     * [신규 추가 - ★수정 버전★] AI 봇 - 대화 요약 커맨드 처리
+     */
+    private Mono<Void> handleSummaryCommand(WebSocketSession session, String roomId, String requesterUsername) {
+        log.info("AI Bot command 'summarize' received for room: {} from user: {}", roomId, requesterUsername);
+
+        // 1. 봇 이름, API URL, 모델 설정
+        final String BOT_USERNAME = "바브봇";
+        final int MESSAGE_LIMIT = 50;
+        final String OLLAMA_API_URL = "http://localhost:11434/api/chat";
+        final String OLLAMA_MODEL = "gemma3:4b"; // (기존 translateMessage에서 사용하는 모델)
+
+        // 2. 채팅방 정보 및 최근 메시지를 가져옵니다.
+        Mono<ChatRoom> roomMono = chatRoomRepository.findById(roomId);
+        Mono<List<ChatMessage>> messagesMono = chatMessageRepository.findByRoomIdOrderByCreatedAtAsc(roomId)
+                .collectList()
+                .map(messages -> messages.subList(Math.max(0, messages.size() - MESSAGE_LIMIT), messages.size()));
+
+        // [수정] Error 3: 'findAllByUsernameIn' 대신 'findByUsername'을 반복 호출하는 안전한 방식으로 변경
+        Mono<Map<String, String>> userNicknameMapMono = messagesMono.flatMap(messages ->
+                Flux.fromIterable(messages)
+                        .map(ChatMessage::getSender) // 메시지 작성자 목록 추출
+                        .distinct() // 중복 제거
+                        .flatMap(username -> userRepository.findByUsername(username) // 각 username으로 User 정보 조회
+                                // 혹시 User를 못찾아도, 닉네임을 username으로 대체하여 진행
+                                .map(User::getNickname)
+                                .defaultIfEmpty(username)
+                                .map(nickname -> Map.entry(username, nickname)) // (username, nickname) 맵 엔트리 생성
+                        )
+                        .collectMap(Map.Entry::getKey, Map.Entry::getValue) // (username, nickname) 맵으로 변환
+        );
+
+        // 3. 모든 정보(채팅방, 메시지, 닉네임)가 준비되면 Ollama 호출
+        return Mono.zip(roomMono, messagesMono, userNicknameMapMono)
+                .flatMap(tuple -> {
+                    ChatRoom room = tuple.getT1(); // [수정] Error 4: 변수명은 'room'입니다.
+                    List<ChatMessage> messages = tuple.getT2();
+                    Map<String, String> userNicknameMap = tuple.getT3();
+
+                    // 4. Ollama에 보낼 '대화 컨텍스트' 문자열 생성
+                    String conversationContext = messages.stream()
+                            .filter(msg -> msg.getMessageType() == ChatMessage.MessageType.TEXT && !msg.getContent().startsWith("@바브봇")) // 봇 호출 메시지 제외
+                            .map(msg -> {
+                                String nickname = userNicknameMap.getOrDefault(msg.getSender(), msg.getSender()); // 닉네임 찾기
+                                return String.format("%s: %s", nickname, msg.getContent());
+                            })
+                            .collect(Collectors.joining("\n"));
+
+                    if (conversationContext.isEmpty()) {
+                        conversationContext = "요약할 대화 내용이 없습니다.";
+                    }
+
+                    // 5. Ollama 프롬프트 구성
+                    String prompt = "다음은 채팅 대화 내용입니다. 이 대화의 핵심 내용을 3줄 이내로 간결하게 요약해주세요.\n\n[대화 내용]\n" + conversationContext;
+
+                    // 6. Ollama API 호출
+                    OllamaRequest ollamaRequest = new OllamaRequest(OLLAMA_MODEL, List.of(new OllamaMessage("user", prompt)), false);
+
+                    return webClient.post().uri(OLLAMA_API_URL).bodyValue(ollamaRequest)
+                            .retrieve()
+                            .bodyToMono(OllamaResponse.class)
+                            .flatMap(ollamaResponse -> {
+                                // 7. Ollama의 응답(요약)을 '바브봇'이 보낸 새 메시지로 생성
+                                String summaryContent = extractTranslatedText(ollamaResponse.getMessage().getContent());
+                                ChatMessage botMessage = new ChatMessage(roomId, BOT_USERNAME, summaryContent);
+                                botMessage.getReadBy().add(BOT_USERNAME); // 봇은 스스로 읽음 처리
+
+                                // 8. 봇 메시지를 DB에 저장
+                                return chatMessageRepository.save(botMessage)
+                                        .flatMap(savedMessage ->
+                                                // 9. 봇 유저 정보를 찾아서 DTO 생성 (DB에 봇 유저가 없을 것을 대비)
+                                                userRepository.findByUsername(BOT_USERNAME)
+                                                        .map(user -> new ChatMessageDto(savedMessage, user))
+                                                        .defaultIfEmpty(new ChatMessageDto(savedMessage, BOT_USERNAME)) // 비상용 DTO 생성
+                                                        .flatMap(chatMessageDto -> {
+                                                            // 10. 봇 메시지를 브로드캐스트
+                                                            broadcastMessage(roomId, OutgoingMessage.forChatMessage(chatMessageDto));
+
+                                                            // [수정] Error 4, 5: 'chatRoom' 대신 'room' 변수 사용
+                                                            room.getMembers().forEach(member -> {
+                                                                if (!member.equals(BOT_USERNAME) && !isUserPresent(roomId, member)) {
+                                                                    unreadCountService.incrementUnreadCount(member, roomId).subscribe();
+                                                                }
+                                                            });
+                                                            chatRoomService.broadcastToAllMembers(room);
+
+                                                            return Mono.empty();
+                                                        })
+                                        ).then();
+                            });
+                })
+                .doOnError(e -> log.error("Error processing summary command: {}", e.getMessage(), e))
+                .then(); // Mono<Void> 반환
     }
     private Mono<ChatMessageDto> createChatMessageDtoWithReplyInfo(ChatMessage message, User sender) {
         ChatMessageDto dto = new ChatMessageDto(message, sender);
@@ -414,5 +534,79 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                     chatRoomService.broadcastToAllMembers(savedRoom);
                 })
                 .then(); // Mono<Void> 반환
+    }
+    // !일정 명령어를 처리하는 함수 (AI 연동)
+    private Mono<Void> processScheduleCommand(String commandText) {
+
+        final String OLLAMA_API_URL = "http://localhost:11434/api/chat";
+        final String OLLAMA_MODEL = "gemma3:4b";
+
+        String prompt = String.format(
+                "Today's date is %s. The user's timezone is KST (UTC+9). " +
+                        "Parse the following request and extract 'title' and 'start' datetime. " +
+
+                        "The 'title' should be the event's *description only*, EXCLUDING any dates or times. " +
+
+                        "The 'start' datetime MUST be in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ), " +
+                        "meaning you MUST convert the user's KST time to UTC (Z). " +
+
+                        "EXAMPLE REQUEST: '10월 22일 오후 3시 팀 회의' -> " +
+                        "EXAMPLE JSON: {\"title\": \"팀 회의\", \"start\": \"2025-10-22T06:00:00Z\"}. " +
+
+                        "Respond ONLY with the JSON object. Request: \"%s\"",
+                LocalDate.now().toString(),
+                commandText
+        );
+
+        OllamaRequest ollamaRequest = new OllamaRequest(OLLAMA_MODEL, List.of(new OllamaMessage("user", prompt)), false);
+
+        return webClient.post().uri(OLLAMA_API_URL)
+                .bodyValue(ollamaRequest)
+                .retrieve()
+                .bodyToMono(OllamaResponse.class)
+                .flatMap(ollamaResponse -> {
+                    try {
+                        // 5. Ollama의 원시 응답 텍스트(Markdown 포함)를 가져옴
+                        String rawResponse = ollamaResponse.getMessage().getContent();
+
+                        // 응답에서 '{'가 처음 나오는 위치를 찾음
+                        int jsonStart = rawResponse.indexOf('{');
+                        // 응답에서 '}'가 마지막으로 나오는 위치를 찾음
+                        int jsonEnd = rawResponse.lastIndexOf('}');
+
+                        // '{'와 '}'를 찾았고, 순서가 맞는지 확인
+                        if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart) {
+                            // 순수한 JSON 문자열만 추출
+                            String cleanJson = rawResponse.substring(jsonStart, jsonEnd + 1);
+
+                            // 6. "깨끗한" JSON을 DTO로 파싱
+                            OllamaScheduleDto dto = objectMapper.readValue(cleanJson, OllamaScheduleDto.class);
+                            // -----------------------------------------------------
+
+                            // 7. DB에 저장할 객체 생성
+                            CalendarEvent newEvent = new CalendarEvent();
+                            newEvent.setTitle(dto.getTitle());
+                            newEvent.setStart(Instant.parse(dto.getStart()));
+
+                            // 8. DB에 새 일정 저장
+                            return calendarEventRepository.save(newEvent);
+                        } else {
+                            // Ollama가 JSON을 아예 반환하지 않음
+                            log.error("Ollama가 JSON을 반환하지 않았습니다: {}", rawResponse);
+                            return Mono.error(new RuntimeException("Ollama가 JSON을 반환하지 않음"));
+                        }
+
+                    } catch (Exception e) {
+                        log.error("Ollama 일정 파싱 최종 실패: {}", e.getMessage());
+                        return Mono.error(new RuntimeException("Ollama 응답 파싱 실패", e));
+                    }
+                })
+                .doOnError(e -> log.error("!일정 처리 중 Ollama 호출 오류: {}", e.getMessage(), e))
+                .then();
+    }
+    @lombok.Data
+    private static class OllamaScheduleDto {
+        private String title;
+        private String start;
     }
 }

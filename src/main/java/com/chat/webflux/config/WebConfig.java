@@ -2,6 +2,7 @@ package com.chat.webflux.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.reactive.config.CorsRegistry;
 import org.springframework.web.reactive.config.ResourceHandlerRegistry;
 import org.springframework.web.reactive.config.WebFluxConfigurer;
 
@@ -18,5 +19,13 @@ public class WebConfig implements WebFluxConfigurer {
         String resourceLocation = "file:" + uploadDir + (uploadDir.endsWith("/") ? "" : "/");
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(resourceLocation);
+    }
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")      // 모든 경로(/api/**)에 대해
+                .allowedOrigins("*")  // 모든 IP 주소에서의 접속을 허용
+                .allowedMethods("*")  // 모든 HTTP 메서드(GET, POST 등) 허용
+                .allowedHeaders("*")  // 모든 헤더 허용
+                .maxAge(3600);
     }
 }

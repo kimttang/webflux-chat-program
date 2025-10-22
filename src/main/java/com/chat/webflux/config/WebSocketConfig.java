@@ -8,8 +8,11 @@ import org.springframework.web.reactive.HandlerMapping;
 import org.springframework.web.reactive.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.server.support.WebSocketHandlerAdapter;
+import org.springframework.web.cors.CorsConfiguration;
 
 import java.util.Map;
+import java.util.Collections;
+import java.util.HashMap;
 
 @Configuration
 public class WebSocketConfig {
@@ -24,8 +27,23 @@ public class WebSocketConfig {
 
     @Bean
     public HandlerMapping handlerMapping(WebSocketHandler chatWebSocketHandler) {
+        // 1. 기존 핸들러 맵 생성
         Map<String, WebSocketHandler> map = Map.of("/chat/**", chatWebSocketHandler);
-        return new SimpleUrlHandlerMapping(map, 1);
+
+        // 2. 매핑 객체 생성
+        SimpleUrlHandlerMapping mapping = new SimpleUrlHandlerMapping(map, 1);
+
+        // 3. ✨ CORS 설정 생성 및 추가
+        Map<String, CorsConfiguration> corsMap = new HashMap<>();
+        CorsConfiguration corsConfig = new CorsConfiguration();
+        corsConfig.setAllowedOrigins(Collections.singletonList("*")); // 모든 IP 허용
+        corsConfig.addAllowedMethod("*");
+        corsConfig.addAllowedHeader("*");
+
+        corsMap.put("/chat/**", corsConfig); // "/chat/**" 경로에 이 CORS 설정 적용
+        mapping.setCorsConfigurations(corsMap);
+
+        return mapping; // 4. 설정이 적용된 매핑 반환
     }
 
     @Bean

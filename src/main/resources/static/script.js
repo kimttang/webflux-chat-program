@@ -43,6 +43,7 @@ const translations = {
     logoutButton: { ko: '로그아웃', en: 'Logout', ja: 'ログアウト', zh: '登出', ar: 'تسجيل خروج' },
     friendsTab: { ko: '친구', en: 'Friends', ja: '友達', zh: '朋友', ar: 'الأصدقاء' },
     chatroomsTab: { ko: '채팅방', en: 'Chat Rooms', ja: 'チャットルーム', zh: '聊天室', ar: 'غرف الدردشة' },
+    calendarTab: { ko: '캘린더', en: 'Calendar', ja: 'カレンダー', zh: '日历', ar: 'التقويم' },
     friendNamePlaceholder: { ko: '친구 아이디 입력', en: "Enter friend's ID", ja: '友達のIDを入力', zh: '输入好友ID', ar: 'أدخل معرف الصديق' },
     addButton: { ko: '추가', en: 'Add', ja: '追加', zh: '添加', ar: 'إضافة' },
     dmButton: { ko: 'DM', en: 'DM', ja: 'DM', zh: '私信', ar: 'رسالة خاصة' },
@@ -171,6 +172,7 @@ const DOM = {
     hideAnnouncementBtn: document.getElementById('hide-announcement-btn'),
     showAnnouncementBtn: document.getElementById('show-announcement-btn'),
     accountDeleteButton: document.getElementById('account-delete-button'),
+    calendarPanel: document.getElementById('calendar-panel'),
 };
 
 DOM.chatHeaderInfo.addEventListener('click', openRoomEditModal);
@@ -434,32 +436,47 @@ function resetFriendSearch() {
         DOM.friendSearchInput.value = ''; // 검색창 내용 비우기
     }
 }
+// [2. switchTab 함수 덮어쓰기]
+
+/**
+ * [수정] "일단 모두 숨기고, 선택한 것만 켜는" 방식으로 변경
+ */
 function switchTab(tabName) {
+
+    // 1. [핵심] 모든 패널과 액션 영역을 일단 다 숨깁니다.
+    // (DOM.calendarPanel이 null이 아니어야 이 코드가 성공합니다)
+    DOM.friendList.classList.add('hidden');
+    DOM.friendsActionArea.classList.add('hidden');
+    DOM.roomList.classList.add('hidden');
+    DOM.chatroomsActionArea.classList.add('hidden');
+    DOM.calendarPanel.classList.add('hidden'); // ✨ 캘린더 패널도 숨깁니다.
+
+    // 2. [핵심] 모든 헤더 아이콘도 일단 다 숨깁니다.
+    DOM.chatFilterButtons.classList.add('hidden');
+    DOM.showFriendSearchButton.classList.add('hidden');
+
+    // resetFriendSearch() 함수가 있다면 호출
+    if (typeof resetFriendSearch === 'function') {
+        resetFriendSearch();
+    }
+
+    // 3. 탭 이름에 맞는 것만 골라서 "다시 켭니다".
     if (tabName === 'friends') {
         // 친구 탭 UI 보이기
         DOM.friendList.classList.remove('hidden');
         DOM.friendsActionArea.classList.remove('hidden');
-        // 채팅 탭 UI 숨기기
-        DOM.roomList.classList.add('hidden');
-        DOM.chatroomsActionArea.classList.add('hidden');
+        DOM.showFriendSearchButton.classList.remove('hidden');
 
-        // [핵심 수정] 헤더 아이콘 토글
-        DOM.chatFilterButtons.classList.add('hidden'); // '채팅' 필터 숨김
-        DOM.showFriendSearchButton.classList.remove('hidden'); // '친구 검색' 아이콘 보임
-        resetFriendSearch(); // (혹시 검색창이 열려있었다면 닫기)
-
-    } else { // 'chatrooms' 탭
-        // 친구 탭 UI 숨기기
-        DOM.friendList.classList.add('hidden');
-        DOM.friendsActionArea.classList.add('hidden');
+    } else if (tabName === 'chatrooms') {
         // 채팅 탭 UI 보이기
         DOM.roomList.classList.remove('hidden');
         DOM.chatroomsActionArea.classList.remove('hidden');
+        DOM.chatFilterButtons.classList.remove('hidden');
 
-        // [핵심 수정] 헤더 아이콘 토글
-        DOM.chatFilterButtons.classList.remove('hidden'); // '채팅' 필터 보임
-        DOM.showFriendSearchButton.classList.add('hidden'); // '친구 검색' 아이콘 숨김
-        resetFriendSearch(); // (혹시 검색창이 열려있었다면 닫기)
+    } else if (tabName === 'calendar') {
+        // ✨ 캘린더 탭 UI 보이기
+        DOM.calendarPanel.classList.remove('hidden');
+        renderCalendar(); // 캘린더 그리기 함수 호출
     }
 }
 function getCharTypePriority(char) {
@@ -542,6 +559,7 @@ function changeLanguage(lang) {
         DOM.tabs.forEach(tab => {
             if (tab.id === 'friends-tab-button') setText(tab, 'friendsTab');
             if (tab.id === 'chatrooms-tab-button') setText(tab, 'chatroomsTab');
+            if (tab.id === 'calendar-tab-button') setText(tab, 'calendarTab');
         });
     }
     setPlaceholder(DOM.friendNameInput, 'friendNamePlaceholder');
@@ -1850,4 +1868,37 @@ function showAnnouncementBar() {
     DOM.announcementBar.classList.remove('hidden');
     DOM.showAnnouncementBtn.classList.add('hidden');
     isAnnouncementManuallyHidden = false; // '수동 숨김' 상태 해제
+}
+
+//캘린더 패널에 FullCalendar를 그리는 함수
+
+let calendarInstance = null; // 중복 렌더링 방지용
+
+function renderCalendar() {
+    // 이미 그렸으면 다시 그리지 않음 (성능 최적화)
+    if (calendarInstance) {
+        return;
+    }
+
+    // calendar-view가 존재하는지 확인 (오류 방지)
+    const calendarEl = document.getElementById('calendar-view');
+    if (!calendarEl) {
+        console.error("캘린더 뷰(#calendar-view)를 찾을 수 없습니다.");
+        return;
+    }
+
+    calendarInstance = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth', // 월간 달력
+        headerToolbar: { // 상단 툴바
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek'
+        },
+        height: '100%',
+        locale: 'ko',
+        events: '/api/calendar',
+        eventDisplay: 'block'
+    });
+
+    calendarInstance.render();
 }

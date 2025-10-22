@@ -6,6 +6,8 @@
     <link rel="icon" type="image/png" href="resource/icon/favicon.png">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css' rel='stylesheet' />
 </head>
 <body>
 <div class="container">
@@ -61,6 +63,9 @@
             <div class="sidebar-body">
                 <ul id="friend-list" class="friend-list"></ul>
                 <ul id="room-list" class="room-list hidden"></ul>
+                <div id="calendar-panel" class="hidden" style="height: 100%;">
+                    <div id="calendar-view" style="height: 100%;"></div>
+                </div>
             </div>
             <div id="friends-action-area">
                 <div class="add-friend-area"><input type="text" id="friend-name-input"><button id="add-friend-button" class="button"></button></div>
@@ -73,6 +78,7 @@
             <div class="tabs">
                 <div class="tab active" data-tab="friends" id="friends-tab-button"></div>
                 <div class="tab" data-tab="chatrooms" id="chatrooms-tab-button"></div>
+                <div class="tab" data-tab="calendar" id="calendar-tab-button"></div>
             </div>
         </div>
     </div>
