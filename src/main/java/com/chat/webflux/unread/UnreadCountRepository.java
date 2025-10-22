@@ -9,4 +9,5 @@ public interface UnreadCountRepository extends ReactiveMongoRepository<UnreadCou
     Flux<UnreadCount> findByUserIdAndRoomId(String userId, String roomId);
 
     Mono<Void> deleteByRoomId(String roomId);
+    Mono<Void> deleteAllByUserId(String userId);
 }

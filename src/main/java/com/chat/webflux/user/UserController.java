@@ -51,4 +51,15 @@ public class UserController {
                         Mono.just(ResponseEntity.badRequest().body(null))
                 );
     }
+    @DeleteMapping("/{username}")
+    public Mono<ResponseEntity<Void>> deleteUser(@PathVariable String username) {
+        return userService.deleteUser(username)
+                .map(ResponseEntity::ok)
+                .onErrorResume(IllegalArgumentException.class, e ->
+                        Mono.just(ResponseEntity.notFound().build())
+                )
+                .onErrorResume(e ->
+                        Mono.just(ResponseEntity.status(500).build())
+                );
+    }
 }

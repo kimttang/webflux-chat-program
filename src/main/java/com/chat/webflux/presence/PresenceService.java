@@ -74,20 +74,32 @@ public class PresenceService {
                         .collect(Collectors.toSet()));
     }
 
+    public void broadcastStatusUpdate(String targetUsername, String userInEvent, String status) {
+        log.info("[SSE SEND] Target: {}, EventUser: {}, Status: {}", targetUsername, userInEvent, status);
+        Sinks.Many<String> sink = userSinks.get(targetUsername);
+        if (sink != null) {
+            try {
+                // PresenceEvent DTO를 재사용하여 "DELETED" 상태를 전송
+                String message = "data: " + objectMapper.writeValueAsString(new PresenceEvent(userInEvent, status)) + "\n\n";
+                sink.tryEmitNext(message);
+                log.info("[SSE SEND] SINK 전송 성공 (Target: {})", targetUsername);
+            } catch (JsonProcessingException e) {
+                log.error("PresenceEvent 직렬화 오류", e);
+            }
+        }
+        else {
+            // [!!! 디버깅 로그 3 !!!]
+            log.warn("[SSE SEND] SINK를 찾지 못함 (Target: {}). (대상이 오프라인이거나 연결된 적 없음)", targetUsername);
+        }
+    }
+
     private void broadcastStatusToFriends(String username, String status) {
         userRepository.findAllByFriendUsernamesContaining(username)
                 .map(User::getUsername)
                 .filter(friendUsername -> !friendUsername.equals(username))
                 .doOnNext(friendUsername -> {
-                    Sinks.Many<String> sink = userSinks.get(friendUsername);
-                    if (sink != null) {
-                        try {
-                            String message = "data: " + objectMapper.writeValueAsString(new PresenceEvent(username, status)) + "\n\n";
-                            sink.tryEmitNext(message);
-                        } catch (JsonProcessingException e) {
-                            log.error("PresenceEvent 직렬화 오류", e);
-                        }
-                    }
+                    // [수정] 분리된 public 메서드를 호출합니다.
+                    broadcastStatusUpdate(friendUsername, username, status);
                 })
                 .subscribe();
     }

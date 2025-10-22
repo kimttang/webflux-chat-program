@@ -29,14 +29,12 @@ const userCache = new Map();
 
 // --- 로그인/회원가입 화면 번역 추가 ---
 const translations = {
-    loginTitle: { ko: '로그인', en: 'Login', ja: 'ログイン', zh: '登录', ar: 'تسجيل الدخول' },
     nicknamePlaceholder: { ko: '닉네임', en: 'Nickname', ja: 'ニックネーム', zh: '昵称', ar: 'اللقب' },
     usernamePlaceholder: { ko: '아이디', en: 'ID', ja: 'ID', zh: '用户名', ar: 'اسم المستخدم' },
     passwordPlaceholder: { ko: '비밀번호', en: 'Password', ja: 'パスワード', zh: '密码', ar: 'كلمة المرور' },
     loginButton: { ko: '로그인', en: 'Login', ja: 'ログイン', zh: '登录', ar: 'تسجيل الدخول' },
     signupPrompt: { ko: '계정이 없으신가요?', en: "Don't have an account?", ja: 'アカウントをお持ちではありませんか？', zh: '没有帐户？', ar: 'ليس لديك حساب؟' },
     showSignup: { ko: '회원가입', en: 'Sign up', ja: '会員登録', zh: '注册', ar: 'اشتراك' },
-    signupTitle: { ko: '회원가입', en: 'Sign Up', ja: '会員登録', zh: '注册', ar: 'اشتراك' },
     signupButton: { ko: '가입하기', en: 'Sign Up', ja: '登録する', zh: '注册', ar: 'اشتراك' },
     loginPrompt: { ko: '이미 계정이 있으신가요?', en: 'Already have an account?', ja: 'すでにアカウントをお持ちですか？', zh: '已有帐户？', ar: 'هل لديك حساب بالفعل؟' },
     showLogin: { ko: '로그인', en: 'Login', ja: 'ログイン', zh: '登录', ar: 'تسجيل الدخول' },
@@ -80,7 +78,6 @@ const DOM = {
     mainScreen: document.getElementById('main-screen'),
     chatScreen: document.getElementById('chat-screen'),
     languageSelectorAuth: document.getElementById('language-selector-auth'),
-    loginTitle: document.getElementById('login-title'),
     loginUsernameInput: document.getElementById('login-username'),
     loginPasswordInput: document.getElementById('login-password'),
     loginButton: document.getElementById('login-button'),
@@ -96,7 +93,6 @@ const DOM = {
     announceConfirmPost: document.getElementById('announce-confirm-post'),
     signupPrompt: document.getElementById('signup-prompt'),
     showSignup: document.getElementById('show-signup'),
-    signupTitle: document.getElementById('signup-title'),
     signupNicknameInput: document.getElementById('signup-nickname'),
     signupUsernameInput: document.getElementById('signup-username'),
     signupPasswordInput: document.getElementById('signup-password'),
@@ -173,7 +169,8 @@ const DOM = {
     showFriendSearchButton: document.getElementById('show-friend-search-button'),
     friendSearchInput: document.getElementById('friend-search-input'),
     hideAnnouncementBtn: document.getElementById('hide-announcement-btn'),
-    showAnnouncementBtn: document.getElementById('show-announcement-btn')
+    showAnnouncementBtn: document.getElementById('show-announcement-btn'),
+    accountDeleteButton: document.getElementById('account-delete-button'),
 };
 
 DOM.chatHeaderInfo.addEventListener('click', openRoomEditModal);
@@ -301,7 +298,7 @@ DOM.userProfileClickable.addEventListener('click', () => { DOM.profileEditPrevie
 DOM.profileEditCancel.addEventListener('click', closeProfileEditModal);
 DOM.profileEditOverlay.addEventListener('click', (e) => { if (e.target === DOM.profileEditOverlay) DOM.profileEditOverlay.classList.add('hidden'); });
 DOM.profileEditPictureButton.addEventListener('click', () => DOM.profileEditFileInput.click());
-
+DOM.accountDeleteButton.addEventListener('click', handleDeleteAccount);
 DOM.profileEditFileInput.addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (file) { const reader = new FileReader(); reader.onload = (e) => { DOM.profileEditPreview.src = e.target.result; }; reader.readAsDataURL(file); }
@@ -527,13 +524,11 @@ function changeLanguage(lang) {
     };
 
     // --- 인증 화면 ---
-    setText(DOM.loginTitle, 'loginTitle');
     setPlaceholder(DOM.loginUsernameInput, 'usernamePlaceholder');
     setPlaceholder(DOM.loginPasswordInput, 'passwordPlaceholder');
     setText(DOM.loginButton, 'loginButton');
     setText(DOM.signupPrompt, 'signupPrompt');
     setText(DOM.showSignup, 'showSignup');
-    setText(DOM.signupTitle, 'signupTitle');
     setPlaceholder(DOM.signupNicknameInput, 'nicknamePlaceholder');
     setPlaceholder(DOM.signupUsernameInput, 'usernamePlaceholder');
     setPlaceholder(DOM.signupPasswordInput, 'passwordPlaceholder');
@@ -838,18 +833,46 @@ function listenToRoomUpdates() {
     };
 }
 
-    function listenToPresenceUpdates() {
+function listenToPresenceUpdates() {
     if (presenceEventSource) presenceEventSource.close();
     presenceEventSource = new EventSource(`/api/presence/${currentUser}/subscribe`);
     presenceEventSource.onmessage = (event) => {
-    try {
-    if (event.data.startsWith('{')) {
-    const { username, status } = JSON.parse(event.data);
-    const statusCircle = document.querySelector(`.status-circle[data-username="${username}"]`);
-    if (statusCircle) { statusCircle.classList.toggle('online', status === 'ONLINE'); }
-}
-} catch (e) { console.warn("Received non-JSON message from presence stream, ignoring.", event.data); }
-};
+        console.log("[Presence SSE] Raw data:", event.data);
+        try {
+            if (event.data.startsWith('{')) {
+                const { username, status } = JSON.parse(event.data);
+                console.log(`[Presence SSE] Parsed: User=${username}, Status=${status}`);
+                if (status === 'DELETED') {
+                    console.log(`[Presence SSE] 'DELETED' 감지. ${username}를 목록에서 제거 시도.`);
+                    // 1. 상태 아이콘(동그라미)을 먼저 찾습니다.
+                    const statusCircle = document.querySelector(`.status-circle[data-username="${username}"]`);
+                    console.log("[Presence SSE] statusCircle 쿼리 결과:", statusCircle);
+                    if (statusCircle) {
+                        // 2. 그 아이콘을 감싸고 있는 부모 <li> (친구 항목)를 찾습니다.
+                        const friendListItem = statusCircle.closest('li');
+                        console.log("[Presence SSE] friendListItem 쿼리 결과:", friendListItem);
+                        if (friendListItem) {
+                            // 3. <li> 항목을 DOM에서 제거합니다.
+                            friendListItem.remove();
+                        }
+                    }
+                    // 4. (방어적 코드) 만약 캐시가 존재한다면 캐시에서도 제거합니다.
+                    if (typeof allFriendsCache !== 'undefined') {
+                        allFriendsCache = allFriendsCache.filter(friend => friend.username !== username);
+                    }
+                    if (typeof onlineFriendsCache !== 'undefined') {
+                        onlineFriendsCache.delete(username);
+                    }
+                } else {
+                    // [기존 로직] 'ONLINE' 또는 'OFFLINE' 상태는 동그라미 색만 변경합니다.
+                    const statusCircle = document.querySelector(`.status-circle[data-username="${username}"]`);
+                    if (statusCircle) {
+                        statusCircle.classList.toggle('online', status === 'ONLINE');
+                    }
+                }
+            }
+        } catch (e) { console.warn("Received non-JSON message from presence stream, ignoring.", event.data); }
+    };
     presenceEventSource.onerror = (e) => { console.error('Presence SSE error:', e); };
 }
 
@@ -956,7 +979,7 @@ function sendMessage() {
 async function loadPreviousMessages() {
     try {
         const response = await fetch(`/api/rooms/${currentRoomId}/messages`, {
-            headers: { 'X-Username': currentUser }
+            headers: { 'X-Username': encodeURIComponent(currentUser) }
         });
         if (!response.ok) {
             const errorText = await response.text();
@@ -1411,7 +1434,69 @@ function updateMessageInUI(updatedMsg) {
         }
     }
 }
+async function handleDeleteAccount() {
+    // [!] 매우 중요: 사용자에게 의사를 재확인합니다.
+    const confirmDelete = confirm(
+        "정말로 계정을 탈퇴하시겠습니까?\n\n" +
+        "모든 채팅방과 친구 목록에서 삭제되며,\n" +
+        "이 작업은 되돌릴 수 없습니다."
+    );
 
+    if (confirmDelete && currentUser) {
+        try {
+            const response = await fetch(`/api/users/${currentUser}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                alert("계정이 성공적으로 탈퇴되었습니다.\n로그인 화면으로 돌아갑니다.");
+                closeModal(DOM.profileEditModal);
+                if (websocket) {
+                    websocket.close();
+                    websocket = null;
+                }
+                if (roomEventSource) {
+                    roomEventSource.close();
+                    roomEventSource = null;
+                }
+                if (presenceEventSource) {
+                    presenceEventSource.close();
+                    presenceEventSource = null;
+                }
+
+                currentUser = null;
+                currentUserObject = null;
+                currentUserNickname = null;
+
+                showAuthScreen();
+            } else {
+                closeModal(DOM.profileEditModal);
+                alert("계정 탈퇴에 실패했습니다. 다시 시도해 주세요.");
+            }
+        } catch (error) {
+            closeModal(DOM.profileEditModal);
+            console.error('Error deleting account:', error);
+            alert("계정 탈퇴 중 오류가 발생했습니다.");
+        }
+    }
+}
+function closeModal(modalElement) {
+    if (modalElement) {
+        modalElement.classList.add('hidden');
+        const overlay = modalElement.closest('.modal-overlay');
+        if (overlay) {
+            overlay.classList.add('hidden');
+        } else {
+            const overlayId = modalElement.id.replace('-modal', '-overlay');
+            const siblingOverlay = document.getElementById(overlayId);
+            if (siblingOverlay) {
+                siblingOverlay.classList.add('hidden');
+            }
+        }
+    }
+}
 //친구 초대 모달을 열고, API를 호출하여 내용을 채우는 메인 함수
 async function openInviteFriendModal(roomId) {
     // 1. 함수가 호출되는 시점과 필요한 값들을 로그로 확인합니다. (디버깅용)

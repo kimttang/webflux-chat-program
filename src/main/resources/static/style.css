@@ -850,3 +850,28 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     padding-right: 8px; /* 검색 아이콘과의 간격 */
     color: var(--main-color);
 }
+.auth-logo {
+    display: block;
+    max-width: 180px;  /* 로고 최대 너비 (조절 가능) */
+    margin: 0 auto 20px auto; /* 위 0, 좌우 auto(가운데 정렬), 아래 20px */
+}
+.button-danger {
+    background-color: #e74c3c; /* 빨간색 배경 */
+    color: white;
+    border: none;
+}
+.button-danger:hover {
+    background-color: #c0392b; /* 더 진한 빨간색 */
+}
+
+/* ===== [추가] 작은 버튼 스타일 ===== */
+.button-small {
+    font-size: 0.8rem;  /* 글씨 크기 작게 */
+    padding: 5px 10px; /* 내부 여백 줄이기 */
+    margin-top: 15px;  /* 위 버튼 그룹과 간격 띄우기 */
+    width: 100%;       /* 모달 너비에 맞춤 */
+}
+#account-delete-button {
+    width: auto;
+    align-self: flex-start;
+}

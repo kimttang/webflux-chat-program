@@ -10,9 +10,12 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+
 @RestController
 @RequestMapping("/api/rooms")
 @RequiredArgsConstructor
@@ -25,17 +28,30 @@ public class ChatMessageController {
 
     @GetMapping("/{roomId}/messages")
     public Flux<ChatMessageDto> getMessagesByRoom(@PathVariable String roomId,
-                                                  @RequestHeader("X-Username") String username) {
+                                                  @RequestHeader("X-Username") String encodedUsername) { // [2. 변수명 변경]
+
+        // [3. 디코딩 로직 추가]
+        final String username;
+        try {
+            // UTF-8을 사용해 한글/특수문자를 원래대로 복원합니다.
+            username = URLDecoder.decode(encodedUsername, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return Flux.error(new IllegalArgumentException("Invalid username encoding"));
+        }
+        // [여기까지 추가]
+
 
         return chatRoomRepository.findById(roomId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("존재하지 않는 채팅방입니다.")))
                 .flatMapMany(chatRoom -> {
+                    // [4. 디코딩된 'username' 변수를 사용하도록 수정]
                     if (chatRoom.getMembers() == null || !chatRoom.getMembers().contains(username)) {
                         return Flux.error(new SecurityException("메시지를 조회할 권한이 없습니다."));
                     }
 
                     int totalMembers = chatRoom.getMembers().size();
 
+                    // --- (이하는 제공해주신 기존 로직과 동일) ---
                     return chatMessageRepository.findByRoomIdOrderByCreatedAtAsc(roomId)
                             .collectList() // 1. 먼저 모든 메시지를 리스트로 가져옵니다.
                             .flatMapMany(messages -> {

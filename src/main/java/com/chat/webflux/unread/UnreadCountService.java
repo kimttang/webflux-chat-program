@@ -1,7 +1,7 @@
 package com.chat.webflux.unread;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DuplicateKeyException; // [1. Import 추가]
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;

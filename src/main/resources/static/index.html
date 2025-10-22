@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>실시간 번역 채팅</title>
+    <title>Babel Bridge</title>
+    <link rel="icon" type="image/png" href="resource/icon/favicon.png">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
@@ -19,7 +20,7 @@
             </select>
         </div>
         <div id="login-form" class="form-container">
-            <h1 id="login-title"></h1>
+            <img src="resource/icon/logo.png" alt="로고" class="auth-logo">
             <div class="input-group"><input type="text" id="login-username"></div>
             <div class="input-group"><input type="password" id="login-password"></div>
             <button id="login-button" class="auth-button"></button>
@@ -27,7 +28,7 @@
             <p style="text-align: center; margin-top: 15px;"><span id="signup-prompt"></span> <a href="#" id="show-signup"></a></p>
         </div>
         <div id="signup-form" class="form-container hidden">
-            <h1 id="signup-title"></h1>
+            <img src="resource/icon/logo.png" alt="로고" class="auth-logo">
             <div class="input-group"><input type="text" id="signup-nickname"></div>
             <div class="input-group"><input type="text" id="signup-username"></div>
             <div class="input-group"><input type="password" id="signup-password"></div>
@@ -132,6 +133,7 @@
             <button id="profile-edit-cancel" class="button">취소</button>
             <button id="profile-edit-save" class="button">저장</button>
         </div>
+        <button id="account-delete-button" class="button button-danger button-small">계정 탈퇴</button>
     </div>
 </div>
 </div>

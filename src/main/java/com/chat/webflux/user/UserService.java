@@ -1,6 +1,11 @@
 package com.chat.webflux.user;
 
+import com.chat.webflux.chatroom.ChatRoomRepository;
+import com.chat.webflux.chatroom.ChatRoomService;
+import com.chat.webflux.presence.PresenceService;
+import com.chat.webflux.unread.UnreadCountRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -14,12 +19,17 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ChatRoomRepository chatRoomRepository;
+    private final ChatRoomService chatRoomService;
+    private final UnreadCountRepository unreadCountRepository;
+    private final PresenceService presenceService;
 
     @Value("${file.upload-dir}")
     private String uploadDir;
@@ -120,6 +130,35 @@ public class UserService {
                         updatedUser.setNickname(newNickname);
                         return userRepository.save(updatedUser);
                     });
+                });
+    }
+    public Mono<Void> deleteUser(String username) {
+        return userRepository.findByUsername(username)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("사용자를 찾을 수 없습니다.")))
+                .flatMap(user -> {
+
+                    // 1. 이 유저가 속한 모든 채팅방에서 나가기
+                    Mono<Void> leaveRooms = chatRoomRepository.findByMembersContaining(username)
+                            .flatMap(room -> chatRoomService.leaveChatRoom(room.getId(), username))
+                            .then();
+
+                    // 2. 다른 유저의 '친구 목록'에서 나를 삭제
+                    Mono<Void> removeFromFriends = userRepository.findAllByFriendUsernamesContaining(username)
+                            .flatMap(friend -> {
+                                log.info("[USER DELETE] 친구 '{}'의 목록에서 '{}'를 삭제합니다.", friend.getUsername(), username);
+                                friend.getFriendUsernames().remove(username);
+                                log.info("[USER DELETE] '{}'에게 '{}'의 'DELETED' 상태 전송 시도.", friend.getUsername(), username);
+                                presenceService.broadcastStatusUpdate(friend.getUsername(), username, "DELETED");
+                                return userRepository.save(friend);
+                            })
+                            .then();
+
+                    // 3. 이 유저의 '안 읽은 카운트' 정보 모두 삭제
+                    Mono<Void> deleteUnreadCounts = unreadCountRepository.deleteAllByUserId(username);
+
+                    // 4. 모든 작업(1,2,3)이 완료된 후, 유저 정보 최종 삭제
+                    return Mono.when(leaveRooms, removeFromFriends, deleteUnreadCounts)
+                            .then(userRepository.delete(user));
                 });
     }
 }
