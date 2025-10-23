@@ -6,3 +6,7 @@ spring:
 
 file:
   upload-dir: ./uploads # 프로젝트 루트 폴더 아래에 uploads 폴더를 사용
+
+ollama:
+  base-url: https://ollama-service-992949675273.us-central1.run.app
+  model: gemma3:4b

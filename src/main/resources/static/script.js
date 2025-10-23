@@ -9,6 +9,7 @@ let currentUser = null;
 let currentUserNickname = null;
 let currentUserObject = null;
 let currentRoomId = null;
+let roomCalendarInstance = null;
 let websocket = null;
 let roomEventSource = null;
 let presenceEventSource = null;
@@ -173,6 +174,19 @@ const DOM = {
     showAnnouncementBtn: document.getElementById('show-announcement-btn'),
     accountDeleteButton: document.getElementById('account-delete-button'),
     calendarPanel: document.getElementById('calendar-panel'),
+    roomCalendarButton: document.getElementById('room-calendar-button'),
+    roomCalendarOverlay: document.getElementById('room-calendar-overlay'),
+    closeRoomCalendarModal: document.getElementById('close-room-calendar-modal'),
+    roomCalendarView: document.getElementById('room-calendar-view'),
+    addPersonalEventButton: document.getElementById('add-personal-event-button'),
+    personalEventOverlay: document.getElementById('personal-event-overlay'),
+    closePersonalEventModal: document.getElementById('close-personal-event-modal'),
+    personalEventTitle: document.getElementById('personal-event-title'),
+    personalEventDate: document.getElementById('personal-event-date'),
+    personalEventTime: document.getElementById('personal-event-time'),
+    calendarActionArea: document.getElementById('calendar-action-area'),
+    cancelPersonalEventButton: document.getElementById('cancel-personal-event-button'),
+    savePersonalEventButton: document.getElementById('save-personal-event-button')
 };
 
 DOM.chatHeaderInfo.addEventListener('click', openRoomEditModal);
@@ -420,6 +434,104 @@ if (DOM.showUnreadChatsButton) {
         applyChatRoomFilter();
     });
 }
+//캘린더
+DOM.roomCalendarButton.addEventListener('click', () => {
+    // (모달을 열고)
+    DOM.roomCalendarOverlay.classList.remove('hidden');
+
+    // "현재 채팅방 ID"를 넘겨서 "두 번째" 캘린더를 그리는 새 함수 호출
+    renderRoomCalendar(currentRoomId);
+});
+
+//  채팅방 캘린더 닫기 함수
+function closeRoomCalendarModal() {
+    DOM.roomCalendarOverlay.classList.add('hidden');
+
+    // 모달을 닫을 때 캘린더 인스턴스를 파괴(destroy (이유: 다른 채팅방에 들어갔을 때 새 캘린더를 그려야 하므로)
+    if (roomCalendarInstance) {
+        roomCalendarInstance.destroy();
+        roomCalendarInstance = null;
+    }
+}
+
+// 닫기 버튼과 오버레이에 닫기 함수 연결
+DOM.closeRoomCalendarModal.addEventListener('click', closeRoomCalendarModal);
+DOM.roomCalendarOverlay.addEventListener('click', (e) => {
+    if (e.target === DOM.roomCalendarOverlay) {
+        closeRoomCalendarModal();
+    }
+});
+function openPersonalEventModal() {
+    // 폼 초기화
+    DOM.personalEventTitle.value = '';
+    DOM.personalEventDate.valueAsDate = new Date(); // 오늘 날짜로 기본값
+    DOM.personalEventTime.value = '09:00'; // 오전 9시로 기본값
+    DOM.personalEventOverlay.classList.remove('hidden');
+}
+
+// 모달 닫기 함수
+function closePersonalEventModal() {
+    DOM.personalEventOverlay.classList.add('hidden');
+}
+
+// "새 일정 추가" 버튼 클릭 시 모달 열기
+DOM.addPersonalEventButton.addEventListener('click', openPersonalEventModal);
+
+// 취소/닫기 버튼 클릭 시 모달 닫기
+DOM.cancelPersonalEventButton.addEventListener('click', closePersonalEventModal);
+DOM.closePersonalEventModal.addEventListener('click', closePersonalEventModal);
+DOM.personalEventOverlay.addEventListener('click', (e) => {
+    if (e.target === DOM.personalEventOverlay) closePersonalEventModal();
+});
+
+// "저장하기" 버튼 클릭 시 API 호출
+DOM.savePersonalEventButton.addEventListener('click', async () => {
+    const title = DOM.personalEventTitle.value;
+    const date = DOM.personalEventDate.value;
+    const time = DOM.personalEventTime.value;
+
+    // 1. (방어 코드)
+    if (!title || !date || !time || !currentUser) {
+        alert('모든 항목을 입력해야 합니다.');
+        return;
+    }
+
+    // 2. [핵심] 날짜(date)와 시간(time)을 ISO 8601 문자열(UTC)로 변환
+    // 예: "2025-10-30" + "14:00" -> "2025-10-30T14:00:00" -> UTC로 변환
+    const localDateTime = new Date(`${date}T${time}`);
+    const startISOString = localDateTime.toISOString();
+
+    // 3. API로 보낼 데이터 DTO
+    const eventData = {
+        title: title,
+        start: startISOString,
+        userId: currentUser // 로그인한 유저 ID
+    };
+
+    // 4. 1단계에서 만든 "직접 생성" API 호출
+    try {
+        const response = await fetch('/api/calendar/personal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(eventData)
+        });
+
+        if (response.ok) {
+            alert('개인 일정이 저장되었습니다.');
+            closePersonalEventModal(); // 모달 닫기
+
+            // [중요] 메인 캘린더(개인용)를 새로고침하여 방금 추가한 일정을 표시
+            if (calendarInstance) {
+                calendarInstance.refetchEvents();
+            }
+        } else {
+            alert('저장에 실패했습니다.');
+        }
+    } catch (error) {
+        console.error('Error saving personal event:', error);
+        alert('저장 중 오류가 발생했습니다.');
+    }
+});
 
 changeLanguage(DOM.languageSelectorAuth.value);
 showAuthScreen();
@@ -437,19 +549,15 @@ function resetFriendSearch() {
     }
 }
 // [2. switchTab 함수 덮어쓰기]
-
-/**
- * [수정] "일단 모두 숨기고, 선택한 것만 켜는" 방식으로 변경
- */
 function switchTab(tabName) {
 
     // 1. [핵심] 모든 패널과 액션 영역을 일단 다 숨깁니다.
-    // (DOM.calendarPanel이 null이 아니어야 이 코드가 성공합니다)
     DOM.friendList.classList.add('hidden');
     DOM.friendsActionArea.classList.add('hidden');
     DOM.roomList.classList.add('hidden');
     DOM.chatroomsActionArea.classList.add('hidden');
-    DOM.calendarPanel.classList.add('hidden'); // ✨ 캘린더 패널도 숨깁니다.
+    DOM.calendarPanel.classList.add('hidden');
+    DOM.calendarActionArea.classList.add('hidden');
 
     // 2. [핵심] 모든 헤더 아이콘도 일단 다 숨깁니다.
     DOM.chatFilterButtons.classList.add('hidden');
@@ -474,9 +582,12 @@ function switchTab(tabName) {
         DOM.chatFilterButtons.classList.remove('hidden');
 
     } else if (tabName === 'calendar') {
-        // ✨ 캘린더 탭 UI 보이기
         DOM.calendarPanel.classList.remove('hidden');
-        renderCalendar(); // 캘린더 그리기 함수 호출
+        DOM.calendarActionArea.classList.remove('hidden');
+
+        if (typeof renderCalendar === 'function') {
+            renderCalendar();
+        }
     }
 }
 function getCharTypePriority(char) {
@@ -1871,34 +1982,115 @@ function showAnnouncementBar() {
 }
 
 //캘린더 패널에 FullCalendar를 그리는 함수
-
 let calendarInstance = null; // 중복 렌더링 방지용
 
 function renderCalendar() {
-    // 이미 그렸으면 다시 그리지 않음 (성능 최적화)
+
+    // 1. (방어 코드 1) "현재 로그인한 유저" 정보(currentUser)가 없으면
+    // 캘린더를 "절대" 그리지 않고 즉시 종료합니다.
+    if (!currentUser) {
+        console.warn("renderCalendar: currentUser가 null입니다.");
+        return;
+    }
+
+    // 2. [핵심] "다른 유저"의 캘린더가 남아있을 수 있으므로,
+    // 탭을 클릭할 때마다 기존 캘린더 인스턴스가 있다면 "파괴"합니다.
     if (calendarInstance) {
-        return;
+        calendarInstance.destroy();
+        calendarInstance = null;
     }
 
-    // calendar-view가 존재하는지 확인 (오류 방지)
+    // 3. 캘린더를 그릴 HTML 요소를 찾음
     const calendarEl = document.getElementById('calendar-view');
-    if (!calendarEl) {
-        console.error("캘린더 뷰(#calendar-view)를 찾을 수 없습니다.");
-        return;
-    }
 
+    // 4. "현재 유저"의 API 주소로 새 FullCalendar 인스턴스 생성
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth', // 월간 달력
-        headerToolbar: { // 상단 툴바
+        initialView: 'dayGridMonth',
+        headerToolbar: {
             left: 'prev,next today',
             center: 'title',
             right: 'dayGridMonth,timeGridWeek'
         },
         height: '100%',
         locale: 'ko',
-        events: '/api/calendar',
-        eventDisplay: 'block'
+        eventDisplay: 'block',
+
+        // "현재 로그인한 유저(currentUser)"의 API를 호출
+        events: '/api/calendar/personal/' + currentUser
     });
 
+    // 5. 캘린더를 화면에 렌더링
     calendarInstance.render();
+}
+// "채팅방 캘린더" 모달에 캘린더를 그리는 함수 (메인 캘린더의 renderCalendar와는 "별개"의 함수)
+function renderRoomCalendar(roomId) {
+
+    // 1. (방어 코드) 이미 캘린더가 그려져 있거나, roomId가 없으면 중복 실행 방지
+    if (roomCalendarInstance || !roomId) {
+        return;
+    }
+
+    // 2. 캘린더를 그릴 HTML 요소를 모달 내부에서 찾음
+    const calendarEl = DOM.roomCalendarView; // (const DOM 객체에 추가한 요소)
+
+    // 3. "두 번째" FullCalendar 인스턴스 생성 (roomCalendarInstance)
+    roomCalendarInstance = new FullCalendar.Calendar(calendarEl, {
+
+        // --- 캘린더 기본 UI 설정 ---
+        initialView: 'dayGridMonth', // '월' 단위로 표시
+        locale: 'ko',                // 언어: 한국어
+        height: '450px',             // 모달 크기에 맞춘 높이
+        eventDisplay: 'block',       // (중요) "오전 9시" 대신 "제목"을 블록으로 표시
+
+        // --- 상단 툴바 설정 ---
+        headerToolbar: {
+            left: 'prev,next today', // 이전/다음/오늘
+            center: 'title',         // 중앙: 제목 (예: "2025년 10월")
+            right: 'dayGridMonth,listWeek' // 월간 보기, 주간 리스트 보기
+        },
+
+        // 캘린더가 로드될 때, 3단계에서 만든 "채팅방 공용" API를 자동 호출
+        events: '/api/calendar/room/' + roomId,
+        eventClick: async function(info) {
+
+            // (A) 로그인한 유저 정보(currentUser)가 없으면 작업 중단
+            if (!currentUser) {
+                alert('로그인이 필요합니다.'); // (또는 showAlert 사용)
+                return;
+            }
+
+            const eventId = info.event.id;     // 클릭한 공용 일정의 고유 ID
+            const eventTitle = info.event.title; // 클릭한 공용 일정의 제목
+
+            // (B) 사용자에게 "복사" 의사를 확인받음
+            if (confirm(`'${eventTitle}' 일정을\n'내 개인 캘린더'에 복사하시겠습니까?`)) {
+                try {
+                    // (C) 4단계에서 만든 "개인 캘린더로 복사" API 호출
+                    const response = await fetch(`/api/calendar/copy-to-personal/${eventId}?userId=${currentUser}`, {
+                        method: 'POST'
+                    });
+
+                    // (D) API 호출 결과 처리
+                    if (response.ok) {
+                        alert('개인 캘린더에 성공적으로 복사되었습니다.');
+
+                        // (선택 사항) 복사 성공 시, 메인 캘린더(개인용)가 켜져 있다면
+                        // 이벤트를 새로고침하여 복사된 일정을 바로 보여줌
+                        if (calendarInstance) {
+                            calendarInstance.refetchEvents();
+                        }
+                    } else {
+                        alert('일정 복사에 실패했습니다.');
+                    }
+                } catch (error) {
+                    console.error('Error copying event:', error);
+                    alert('복사 중 오류가 발생했습니다.');
+                }
+            }
+            // (사용자가 '취소'를 누르면 아무 일도 일어나지 않음)
+        }
+    });
+
+    // 4. 설정이 완료된 캘린더를 화면에 실제로 그림
+    roomCalendarInstance.render();
 }

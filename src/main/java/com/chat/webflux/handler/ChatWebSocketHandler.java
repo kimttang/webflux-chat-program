@@ -2,7 +2,9 @@ package com.chat.webflux.handler;
 
 import com.chat.webflux.calendar.CalendarEvent;
 import com.chat.webflux.calendar.CalendarEventRepository;
+import com.chat.webflux.chatroom.ChatRoom;
 import com.chat.webflux.chatroom.ChatRoomRepository;
+import com.chat.webflux.chatroom.ChatRoomService;
 import com.chat.webflux.dto.*;
 import com.chat.webflux.message.ChatMessage;
 import com.chat.webflux.message.ChatMessageRepository;
@@ -11,14 +13,9 @@ import com.chat.webflux.unread.UnreadCountService;
 import com.chat.webflux.user.User;
 import com.chat.webflux.user.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.chat.webflux.chatroom.ChatRoomService;
-import com.chat.webflux.chatroom.ChatRoom;
-
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.socket.WebSocketHandler;
@@ -30,11 +27,14 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -51,7 +51,12 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     private final UnreadCountService unreadCountService;
     private final ChatRoomService chatRoomService;
     private final CalendarEventRepository calendarEventRepository;
+    private final WebClient.Builder webClientBuilder;
 
+    @Value("${ollama.base-url}")
+    private String ollamaBaseUrl;
+    @Value("${ollama.model}")
+    private String ollamaModel;
 
     @Override
     public Mono<Void> handle(WebSocketSession session) {
@@ -209,12 +214,15 @@ public class ChatWebSocketHandler implements WebSocketHandler {
             }
         }
 
+        // !일정 감지 시, "roomId"를 인자로 넘겨줌
         if (content != null && content.startsWith("!일정 ")) {
             String commandText = content.substring(4).trim();
-            return processScheduleCommand(commandText);
+
+            //roomId를 함께 전달하도록 수정
+            return processScheduleCommand(commandText, roomId);
         }
 
-        ChatMessage chatMessage = new ChatMessage(roomId, username,content);
+        ChatMessage chatMessage = new ChatMessage(roomId, username, content);
         if (incomingMessage.getReplyToMessageId() != null && !incomingMessage.getReplyToMessageId().isEmpty()) {
             chatMessage.setReplyToMessageId(incomingMessage.getReplyToMessageId());
         }
@@ -259,6 +267,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 
 
     }
+
     /**
      * [신규 추가 - ★수정 버전★] AI 봇 - 대화 요약 커맨드 처리
      */
@@ -353,6 +362,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 .doOnError(e -> log.error("Error processing summary command: {}", e.getMessage(), e))
                 .then(); // Mono<Void> 반환
     }
+
     private Mono<ChatMessageDto> createChatMessageDtoWithReplyInfo(ChatMessage message, User sender) {
         ChatMessageDto dto = new ChatMessageDto(message, sender);
 
@@ -412,6 +422,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 })
                 .then();
     }
+
     private void broadcastMessageUpdate(ChatMessage message, String roomId) {
         userRepository.findByUsername(message.getSender())
                 .map(user -> new ChatMessageDto(message, user))
@@ -423,6 +434,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 })
                 .subscribe();
     }
+
     private Mono<Void> handleDeleteMessage(IncomingMessage incomingMessage, String username, String roomId) {
         return chatMessageRepository.findById(incomingMessage.getMessageId())
                 .flatMap(message -> {
@@ -446,26 +458,30 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 
 
     private Mono<Void> translateMessage(String messageId, String text, String targetLang, String username) {
-        String url = "http://localhost:11434/api/chat";
+        final String OLLAMA_API_URL = this.ollamaBaseUrl + "/api/chat";
         String prompt = "You are an expert translator. Your sole purpose is to translate text. " +
                 "Provide only the translated text, without any explanations, original text, or any other words. " +
                 "Translate the following text to " + targetLang + ":\n\n" + text;
 
-        OllamaRequest request = new OllamaRequest("gemma3:4b", Collections.singletonList(new OllamaMessage("user", prompt)), false);
+        OllamaRequest request = new OllamaRequest(this.ollamaModel, Collections.singletonList(new OllamaMessage("user", prompt)), false);
+
+        // --- [수정 4] webClient가 수정된 OLLAMA_API_URL을 사용하도록 변경 ---
         return webClient.post()
-                .uri(url)
+                .uri(OLLAMA_API_URL) // 수정된 변수 사용
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(OllamaResponse.class)
                 .flatMap(response -> {
                     String translatedText = extractTranslatedText(response.getMessage().getContent());
-                    return chatMessageRepository.findById(messageId)
+
+                    // (이하 로직은 모두 동일)
+                    return chatMessageRepository.findById(messageId) // [ChatMessageRepository.java]
                             .flatMap(message -> {
                                 message.getTranslations().put(targetLang, translatedText);
                                 return chatMessageRepository.save(message);
                             })
                             .doOnSuccess(savedMessage -> {
-                                OutgoingMessage outgoingMessage = OutgoingMessage.forTranslateResult(username, translatedText, messageId);
+                                OutgoingMessage outgoingMessage = OutgoingMessage.forTranslateResult(username, translatedText, messageId); // [OutgoingMessage.java]
                                 broadcastMessage(savedMessage.getRoomId(), outgoingMessage);
                             });
                 })
@@ -477,6 +493,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         return chatMessageRepository.findById(messageId)
                 .map(ChatMessage::getRoomId);
     }
+
     public void broadcastMessage(String roomId, OutgoingMessage outgoingMessage, WebSocketSession exclude) {
         Set<WebSocketSession> roomSessions = sessions.get(roomId);
         if (roomSessions != null) {
@@ -490,27 +507,33 @@ public class ChatWebSocketHandler implements WebSocketHandler {
             }
         }
     }
+
     public void broadcastMessage(String roomId, OutgoingMessage outgoingMessage) {
         broadcastMessage(roomId, outgoingMessage, null);
     }
+
     private String extractTranslatedText(String rawContent) {
         if (rawContent == null) return "";
         String cleanedContent = rawContent.replace("\"", "").replace("*", "").trim();
         String[] lines = cleanedContent.split("\\n");
         return lines.length > 0 ? lines[0].trim() : cleanedContent;
     }
+
     public boolean isUserPresent(String roomId, String username) {
         Set<WebSocketSession> roomSessions = sessions.get(roomId);
         if (roomSessions == null) return false;
         return roomSessions.stream().anyMatch(s -> username.equals(getUsernameFromUri(s)));
     }
+
     private boolean isUserPresentInAnyRoom(String username) {
         return sessions.values().stream().flatMap(Set::stream).anyMatch(s -> username.equals(getUsernameFromUri(s)));
     }
+
     private String getRoomId(WebSocketSession session) {
         String path = session.getHandshakeInfo().getUri().getPath();
         return path.substring(path.lastIndexOf('/') + 1);
     }
+
     private String getUsernameFromUri(WebSocketSession session) {
         try {
             String username = UriComponentsBuilder.fromUri(session.getHandshakeInfo().getUri()).build().getQueryParams().getFirst("username");
@@ -520,6 +543,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
             return null;
         }
     }
+
     private Mono<Void> handleUpdateAnnouncement(WebSocketSession session, String content) {
         String roomId = getRoomId(session);
         // 1. DB에서 채팅방을 찾습니다.
@@ -535,24 +559,22 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 })
                 .then(); // Mono<Void> 반환
     }
+
     // !일정 명령어를 처리하는 함수 (AI 연동)
-    private Mono<Void> processScheduleCommand(String commandText) {
+    private Mono<Void> processScheduleCommand(String commandText, String roomId) { // ✨ roomId 인자 추가
 
         final String OLLAMA_API_URL = "http://localhost:11434/api/chat";
         final String OLLAMA_MODEL = "gemma3:4b";
 
+        // ollama가 제목에 날짜를 빼도록 프롬프트 수정
         String prompt = String.format(
                 "Today's date is %s. The user's timezone is KST (UTC+9). " +
                         "Parse the following request and extract 'title' and 'start' datetime. " +
-
-                        "The 'title' should be the event's *description only*, EXCLUDING any dates or times. " +
-
+                        "The 'title' should be the event's *description only*, EXCLUDING any dates or times. " + // 제목 수정
                         "The 'start' datetime MUST be in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ), " +
                         "meaning you MUST convert the user's KST time to UTC (Z). " +
-
                         "EXAMPLE REQUEST: '10월 22일 오후 3시 팀 회의' -> " +
                         "EXAMPLE JSON: {\"title\": \"팀 회의\", \"start\": \"2025-10-22T06:00:00Z\"}. " +
-
                         "Respond ONLY with the JSON object. Request: \"%s\"",
                 LocalDate.now().toString(),
                 commandText
@@ -566,32 +588,27 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 .bodyToMono(OllamaResponse.class)
                 .flatMap(ollamaResponse -> {
                     try {
-                        // 5. Ollama의 원시 응답 텍스트(Markdown 포함)를 가져옴
                         String rawResponse = ollamaResponse.getMessage().getContent();
 
-                        // 응답에서 '{'가 처음 나오는 위치를 찾음
                         int jsonStart = rawResponse.indexOf('{');
-                        // 응답에서 '}'가 마지막으로 나오는 위치를 찾음
                         int jsonEnd = rawResponse.lastIndexOf('}');
 
-                        // '{'와 '}'를 찾았고, 순서가 맞는지 확인
                         if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart) {
-                            // 순수한 JSON 문자열만 추출
                             String cleanJson = rawResponse.substring(jsonStart, jsonEnd + 1);
-
-                            // 6. "깨끗한" JSON을 DTO로 파싱
                             OllamaScheduleDto dto = objectMapper.readValue(cleanJson, OllamaScheduleDto.class);
-                            // -----------------------------------------------------
 
                             // 7. DB에 저장할 객체 생성
                             CalendarEvent newEvent = new CalendarEvent();
                             newEvent.setTitle(dto.getTitle());
                             newEvent.setStart(Instant.parse(dto.getStart()));
 
+                            //  "채팅방 공용 캘린더"로 저장
+                            newEvent.setScope("ROOM"); // 범위 = 채팅방
+                            newEvent.setOwnerId(roomId);   // 주인 = 현재 채팅방 ID
+
                             // 8. DB에 새 일정 저장
                             return calendarEventRepository.save(newEvent);
                         } else {
-                            // Ollama가 JSON을 아예 반환하지 않음
                             log.error("Ollama가 JSON을 반환하지 않았습니다: {}", rawResponse);
                             return Mono.error(new RuntimeException("Ollama가 JSON을 반환하지 않음"));
                         }
@@ -604,6 +621,8 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 .doOnError(e -> log.error("!일정 처리 중 Ollama 호출 오류: {}", e.getMessage(), e))
                 .then();
     }
+
+    // (OllamaScheduleDto 내부 클래스 정의는 그대로 둡니다)
     @lombok.Data
     private static class OllamaScheduleDto {
         private String title;
