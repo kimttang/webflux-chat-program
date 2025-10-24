@@ -186,7 +186,14 @@ const DOM = {
     personalEventTime: document.getElementById('personal-event-time'),
     calendarActionArea: document.getElementById('calendar-action-area'),
     cancelPersonalEventButton: document.getElementById('cancel-personal-event-button'),
-    savePersonalEventButton: document.getElementById('save-personal-event-button')
+    savePersonalEventButton: document.getElementById('save-personal-event-button'),
+    roomGalleryButton: document.getElementById('room-gallery-button'),
+    roomGalleryOverlay: document.getElementById('room-gallery-overlay'),
+    closeRoomGalleryModal: document.getElementById('close-room-gallery-modal'),
+    galleryImagesContent: document.getElementById('gallery-images-content'),
+    galleryFilesContent: document.getElementById('gallery-files-content'),
+    galleryTabImages: document.querySelector('#room-gallery-modal .tab-link[data-tab="gallery-images"]'),
+    galleryTabFiles: document.querySelector('#room-gallery-modal .tab-link[data-tab="gallery-files"]')
 };
 
 DOM.chatHeaderInfo.addEventListener('click', openRoomEditModal);
@@ -532,6 +539,127 @@ DOM.savePersonalEventButton.addEventListener('click', async () => {
         alert('저장 중 오류가 발생했습니다.');
     }
 });
+
+// ✨ [신규 4-2] 갤러리 모달 열기
+DOM.roomGalleryButton.addEventListener('click', () => {
+    // (모달을 열 때 "현재 채팅방 ID"로 2단계 API 호출)
+    openGalleryModal(currentRoomId);
+});
+
+// ✨ [신규 4-2] 갤러리 모달 닫기 함수
+function closeGalleryModal() {
+    DOM.roomGalleryOverlay.classList.add('hidden');
+    // (모달을 닫을 때 내용을 비움)
+    DOM.galleryImagesContent.innerHTML = '';
+    DOM.galleryFilesContent.innerHTML = '';
+}
+
+// (닫기 버튼/오버레이에 닫기 함수 연결)
+DOM.closeRoomGalleryModal.addEventListener('click', closeGalleryModal);
+DOM.roomGalleryOverlay.addEventListener('click', (e) => {
+    if (e.target === DOM.roomGalleryOverlay) closeGalleryModal();
+});
+
+// ✨ [신규 4-2] 갤러리 "탭" 전환 로직
+DOM.galleryTabImages.addEventListener('click', () => {
+    DOM.galleryTabImages.classList.add('active');
+    DOM.galleryTabFiles.classList.remove('active');
+    DOM.galleryImagesContent.classList.remove('hidden');
+    DOM.galleryFilesContent.classList.add('hidden');
+});
+DOM.galleryTabFiles.addEventListener('click', () => {
+    DOM.galleryTabImages.classList.remove('active');
+    DOM.galleryTabFiles.classList.add('active');
+    DOM.galleryImagesContent.classList.add('hidden');
+    DOM.galleryFilesContent.classList.remove('hidden');
+});
+
+
+//갤러리 모달을 열고, 2단계 API를 호출하는 메인 함수
+async function openGalleryModal(roomId) {
+    if (!roomId) return;
+
+    // (기존 내용 비우기 및 초기 탭 설정)
+    DOM.galleryImagesContent.innerHTML = '';
+    DOM.galleryFilesContent.innerHTML = '';
+    DOM.galleryTabImages.click(); // (항상 이미지 탭을 기본으로)
+
+    try {
+        // 2단계 API 호출 (ChatMessageController에 추가한 것)
+        const response = await fetch(`/api/rooms/${roomId}/gallery`);
+        const messages = await response.json(); // (ChatMessageDto 목록)
+
+        let imageCount = 0;
+        let fileCount = 0;
+
+        if (messages.length === 0) {
+            DOM.galleryImagesContent.innerHTML = '<p>업로드된 파일이 없습니다.</p>';
+            DOM.roomGalleryOverlay.classList.remove('hidden');
+            return;
+        }
+
+        // [핵심] 메시지를 "이미지"와 "파일"로 분류
+        messages.forEach(msg => {
+
+            // ChatMessage.java의 MessageType.IMAGE
+            if (msg.messageType === 'IMAGE') {
+                imageCount++;
+                const imgLink = document.createElement('a');
+                imgLink.href = msg.fileUrl;
+                imgLink.target = '_blank';
+                imgLink.title = msg.content || `이미지 (${msg.sender.username})`;
+
+                const img = document.createElement('img');
+                img.src = msg.fileUrl; // (썸네일이 필요하면 썸네일 URL 사용)
+
+                imgLink.appendChild(img);
+                DOM.galleryImagesContent.appendChild(imgLink);
+
+                // ChatMessage.java의 MessageType.FILE
+            } else if (msg.messageType === 'FILE') {
+                fileCount++;
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'file-list-item'; // (CSS로 꾸며야 함)
+
+                const link = document.createElement('a');
+                link.href = msg.fileUrl;
+                // ChatMessage.java의 content (파일 업로드 시 원본 파일명 저장)
+                link.textContent = msg.content || '다운로드';
+                link.target = '_blank';
+                link.download = msg.content || ''; // 원본 파일명으로 다운로드
+
+                // (보낸 사람, 날짜 등 추가 정보)
+                const senderSpan = document.createElement('span');
+                senderSpan.className = 'file-sender';
+                senderSpan.textContent = ` | by ${msg.sender.username}`;
+
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'file-date';
+                dateSpan.textContent = ` | ${new Date(msg.createdAt).toLocaleDateString()}`;
+
+                fileDiv.appendChild(link);
+                fileDiv.appendChild(senderSpan);
+                fileDiv.appendChild(dateSpan);
+                DOM.galleryFilesContent.appendChild(fileDiv);
+            }
+        });
+
+        // 탭에 카운트 표시 (선택 사항)
+        DOM.galleryTabImages.textContent = `이미지 (${imageCount})`;
+        DOM.galleryTabFiles.textContent = `파일 (${fileCount})`;
+
+        // (방어 코드) 만약 이미지/파일이 하나도 없으면 메시지 표시
+        if (imageCount === 0) DOM.galleryImagesContent.innerHTML = '<p>업로드된 이미지가 없습니다.</p>';
+        if (fileCount === 0) DOM.galleryFilesContent.innerHTML = '<p>업로드된 파일이 없습니다.</p>';
+
+        // 분류가 끝나면 모달 표시
+        DOM.roomGalleryOverlay.classList.remove('hidden');
+
+    } catch (error) {
+        console.error('갤러리 로딩 실패:', error);
+        alert('파일 보관함을 불러오는 데 실패했습니다.');
+    }
+}
 
 changeLanguage(DOM.languageSelectorAuth.value);
 showAuthScreen();
@@ -1195,7 +1323,7 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
     if (!isMyMessage && !isContinuous) {
         const profilePic = document.createElement('img');
         profilePic.src = msg.senderProfileUrl || DEFAULT_PROFILE_PICTURE;
-        profilePic.className = 'avatar';
+        profilePic.className = 'message-avatar';
         messageContainer.appendChild(profilePic);
     }
 
@@ -1986,25 +2114,20 @@ let calendarInstance = null; // 중복 렌더링 방지용
 
 function renderCalendar() {
 
-    // 1. (방어 코드 1) "현재 로그인한 유저" 정보(currentUser)가 없으면
-    // 캘린더를 "절대" 그리지 않고 즉시 종료합니다.
+    // (기존 방어 코드)
     if (!currentUser) {
         console.warn("renderCalendar: currentUser가 null입니다.");
         return;
     }
-
-    // 2. [핵심] "다른 유저"의 캘린더가 남아있을 수 있으므로,
-    // 탭을 클릭할 때마다 기존 캘린더 인스턴스가 있다면 "파괴"합니다.
     if (calendarInstance) {
         calendarInstance.destroy();
         calendarInstance = null;
     }
 
-    // 3. 캘린더를 그릴 HTML 요소를 찾음
     const calendarEl = document.getElementById('calendar-view');
 
-    // 4. "현재 유저"의 API 주소로 새 FullCalendar 인스턴스 생성
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
+        // (기존 옵션)
         initialView: 'dayGridMonth',
         headerToolbar: {
             left: 'prev,next today',
@@ -2014,71 +2137,149 @@ function renderCalendar() {
         height: '100%',
         locale: 'ko',
         eventDisplay: 'block',
+        events: '/api/calendar/personal/' + currentUser, // 개인 일정 (R)
 
-        // "현재 로그인한 유저(currentUser)"의 API를 호출
-        events: '/api/calendar/personal/' + currentUser
+        // [U] 1. 일정을 마우스로 드래그할 수 있게 허용
+        editable: true,
+
+        /**
+         * [U] 2. 드래그 앤 드롭("Drop")으로 날짜/시간 "수정" 시
+         */
+        eventDrop: async function(info) {
+            const eventId = info.event.id;
+            const newStartDate = info.event.startStr; // 변경된 시작 시간 (ISO 문자열)
+
+            try {
+                // 1-4에서 만든 "수정(PUT)" API 호출 (권한은 백엔드가 검사)
+                const response = await fetch(`/api/calendar/${eventId}?userId=${currentUser}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    // "start" 필드만 수정하도록 요청
+                    body: JSON.stringify({ start: newStartDate })
+                });
+
+                if (!response.ok) {
+                    throw new Error('수정 권한이 없거나 서버 오류 발생');
+                }
+                // (성공 시 DB에 반영됨. UI는 이미 바뀌어 있음)
+
+            } catch (error) {
+                console.error('날짜 변경 실패:', error);
+                alert('날짜 변경에 실패했습니다. (권한 확인)');
+                info.revert(); // ✨ 실패 시, 드래그를 원위치시킴
+            }
+        },
+
+        /**
+         * [D] 3. 일정을 "클릭"했을 때 "삭제"
+         */
+        eventClick: async function(info) {
+            const eventId = info.event.id;
+            const eventTitle = info.event.title;
+
+            // (참고: 나중에 "수정" 폼을 띄우려면 이 부분을 수정해야 함)
+            if (confirm(`'${eventTitle}' 일정을 "삭제"하시겠습니까?`)) {
+                try {
+                    // 1-4에서 만든 "삭제(DELETE)" API 호출 (권한은 백엔드가 검사)
+                    const response = await fetch(`/api/calendar/${eventId}?userId=${currentUser}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('삭제 권한이 없거나 서버 오류 발생');
+                    }
+
+                    // 성공 시 캘린더 UI 새로고침 (DB에서 지워졌으므로)
+                    alert('삭제되었습니다.');
+                    calendarInstance.refetchEvents();
+
+                } catch (error) {
+                    console.error('삭제 실패:', error);
+                    alert('삭제에 실패했습니다. (권한 확인)');
+                }
+            }
+        }
     });
 
-    // 5. 캘린더를 화면에 렌더링
     calendarInstance.render();
 }
 // "채팅방 캘린더" 모달에 캘린더를 그리는 함수 (메인 캘린더의 renderCalendar와는 "별개"의 함수)
 function renderRoomCalendar(roomId) {
 
-    // 1. (방어 코드) 이미 캘린더가 그려져 있거나, roomId가 없으면 중복 실행 방지
+    // (기존 방어 코드)
     if (roomCalendarInstance || !roomId) {
         return;
     }
 
-    // 2. 캘린더를 그릴 HTML 요소를 모달 내부에서 찾음
-    const calendarEl = DOM.roomCalendarView; // (const DOM 객체에 추가한 요소)
+    const calendarEl = DOM.roomCalendarView;
 
-    // 3. "두 번째" FullCalendar 인스턴스 생성 (roomCalendarInstance)
     roomCalendarInstance = new FullCalendar.Calendar(calendarEl, {
-
-        // --- 캘린더 기본 UI 설정 ---
-        initialView: 'dayGridMonth', // '월' 단위로 표시
-        locale: 'ko',                // 언어: 한국어
-        height: '450px',             // 모달 크기에 맞춘 높이
-        eventDisplay: 'block',       // (중요) "오전 9시" 대신 "제목"을 블록으로 표시
-
-        // --- 상단 툴바 설정 ---
+        // (기존 옵션)
+        initialView: 'dayGridMonth',
+        locale: 'ko',
+        height: '450px',
+        eventDisplay: 'block',
         headerToolbar: {
-            left: 'prev,next today', // 이전/다음/오늘
-            center: 'title',         // 중앙: 제목 (예: "2025년 10월")
-            right: 'dayGridMonth,listWeek' // 월간 보기, 주간 리스트 보기
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,listWeek'
+        },
+        events: '/api/calendar/room/' + roomId, // 공용 일정 (R)
+
+        // --- ✨ [신규 UD] ---
+
+        // [U] 1. 일정을 마우스로 드래그할 수 있게 허용 (공용)
+        editable: true,
+
+        /**
+         * [U] 2. 드래그 앤 드롭("Drop")으로 날짜/시간 "수정" 시 (공용)
+         */
+        eventDrop: async function(info) {
+            const eventId = info.event.id;
+            const newStartDate = info.event.startStr;
+
+            try {
+                // 1-4에서 만든 "수정(PUT)" API 호출 (권한은 백엔드가 검사)
+                const response = await fetch(`/api/calendar/${eventId}?userId=${currentUser}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ start: newStartDate })
+                });
+
+                if (!response.ok) {
+                    throw new Error('수정 권한이 없거나 서버 오류 발생');
+                }
+                // (성공 시 DB에 반영됨)
+
+            } catch (error) {
+                console.error('날짜 변경 실패:', error);
+                alert('날짜 변경에 실패했습니다. (채팅방 멤버 권한 확인)');
+                info.revert(); // ✨ 실패 시, 드래그를 원위치시킴
+            }
         },
 
-        // 캘린더가 로드될 때, 3단계에서 만든 "채팅방 공용" API를 자동 호출
-        events: '/api/calendar/room/' + roomId,
+        /**
+         * [D / C] 3. 일정을 "클릭"했을 때 "삭제" 또는 "복사"
+         */
         eventClick: async function(info) {
-
-            // (A) 로그인한 유저 정보(currentUser)가 없으면 작업 중단
             if (!currentUser) {
-                alert('로그인이 필요합니다.'); // (또는 showAlert 사용)
+                alert('로그인이 필요합니다.');
                 return;
             }
 
-            const eventId = info.event.id;     // 클릭한 공용 일정의 고유 ID
-            const eventTitle = info.event.title; // 클릭한 공용 일정의 제목
+            const eventId = info.event.id;
+            const eventTitle = info.event.title;
 
-            // (B) 사용자에게 "복사" 의사를 확인받음
-            if (confirm(`'${eventTitle}' 일정을\n'내 개인 캘린더'에 복사하시겠습니까?`)) {
+            // ✨ [핵심 수정] "복사" / "삭제" 선택창
+            const action = prompt(`'${eventTitle}'\n\n이 일정으로 무엇을 하시겠습니까?\n'1': 내 캘린더로 복사\n'2': 이 일정 삭제하기\n(1 또는 2 입력)`);
+
+            if (action === '1') {
+                // --- (C) 기존 "복사" 로직 (7단계에서 만든 것) ---
                 try {
-                    // (C) 4단계에서 만든 "개인 캘린더로 복사" API 호출
-                    const response = await fetch(`/api/calendar/copy-to-personal/${eventId}?userId=${currentUser}`, {
-                        method: 'POST'
-                    });
-
-                    // (D) API 호출 결과 처리
+                    const response = await fetch(`/api/calendar/copy-to-personal/${eventId}?userId=${currentUser}`, { method: 'POST' });
                     if (response.ok) {
                         alert('개인 캘린더에 성공적으로 복사되었습니다.');
-
-                        // (선택 사항) 복사 성공 시, 메인 캘린더(개인용)가 켜져 있다면
-                        // 이벤트를 새로고침하여 복사된 일정을 바로 보여줌
-                        if (calendarInstance) {
-                            calendarInstance.refetchEvents();
-                        }
+                        if (calendarInstance) calendarInstance.refetchEvents();
                     } else {
                         alert('일정 복사에 실패했습니다.');
                     }
@@ -2086,11 +2287,33 @@ function renderRoomCalendar(roomId) {
                     console.error('Error copying event:', error);
                     alert('복사 중 오류가 발생했습니다.');
                 }
+
+            } else if (action === '2') {
+                // --- (D) 신규 "삭제" 로직 ---
+                if (confirm(`정말로 공용 일정 '${eventTitle}'을(를) "삭제"하시겠습니까?\n이 작업은 모든 채팅방 멤버에게 영향을 줍니다.`)) {
+                    try {
+                        // 1-4에서 만든 "삭제(DELETE)" API 호출 (권한은 백엔드가 검사)
+                        const response = await fetch(`/api/calendar/${eventId}?userId=${currentUser}`, {
+                            method: 'DELETE'
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('삭제 권한이 없거나 서버 오류 발생');
+                        }
+
+                        // 성공 시 "공용" 캘린더 UI 새로고침
+                        alert('공용 일정이 삭제되었습니다.');
+                        roomCalendarInstance.refetchEvents();
+
+                    } catch (error) {
+                        console.error('삭제 실패:', error);
+                        alert('삭제에 실패했습니다. (채팅방 멤버 권한 확인)');
+                    }
+                }
             }
-            // (사용자가 '취소'를 누르면 아무 일도 일어나지 않음)
+            // (1 또는 2 외의 값은 무시)
         }
     });
 
-    // 4. 설정이 완료된 캘린더를 화면에 실제로 그림
     roomCalendarInstance.render();
 }

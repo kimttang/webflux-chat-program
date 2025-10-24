@@ -99,6 +99,9 @@
             <button id="room-calendar-button" class="icon-button" title="공용 캘린더">
                 <i class="fas fa-calendar-alt"></i>
             </button>
+            <button id="room-gallery-button" class="icon-button" title="파일 보관함">
+                <i class="fas fa-folder-open"></i>
+            </button>
         </div>
         <div id="announcement-bar" class="announcement-bar hidden">
             <i class="fas fa-bullhorn"></i>
@@ -238,6 +241,26 @@
         <div class="modal-buttons">
             <button id="cancel-personal-event-button" class="button button-secondary">취소</button>
             <button id="save-personal-event-button" class="button">저장하기</button>
+        </div>
+    </div>
+</div>
+<div id="room-gallery-overlay" class="overlay hidden">
+    <div id="room-gallery-modal" class="modal modal-large">
+        <div class="modal-header">
+            <h2 id="room-gallery-title">파일 보관함</h2>
+            <button id="close-room-gallery-modal" class="close-button">&times;</button>
+        </div>
+
+        <div class="modal-tabs">
+            <button class="tab-link active" data-tab="gallery-images">이미지</button>
+            <button class="tab-link" data-tab="gallery-files">파일</button>
+        </div>
+
+        <div class="modal-body">
+            <div id="gallery-images-content" class="gallery-grid">
+            </div>
+            <div id="gallery-files-content" class="gallery-list hidden">
+            </div>
         </div>
     </div>
 </div>

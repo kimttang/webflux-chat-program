@@ -116,4 +116,18 @@ public class ChatMessageController {
                                 .defaultIfEmpty(new ChatMessageDto(message, message.getSender()))
                 );
     }
+
+    // 특정 채팅방의 모든 파일/이미지 목록 (갤러리) 조회
+    @GetMapping("/{roomId}/gallery")
+    public Flux<ChatMessageDto> getRoomGallery(@PathVariable String roomId) {
+
+        // 1. 1단계에서 만든 쿼리 메서드 호출
+        return chatMessageRepository.findByRoomIdAndFileUrlIsNotNullOrderByCreatedAtDesc(roomId)
+                .flatMap(message ->
+                        // 2. 메시지 DTO로 변환 (기존 검색 로직과 동일)
+                        userService.findByUsername(message.getSender())
+                                .map(user -> new ChatMessageDto(message, user))
+                                .defaultIfEmpty(new ChatMessageDto(message, message.getSender()))
+                );
+    }
 }
