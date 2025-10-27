@@ -6,7 +6,7 @@
 }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: var(--main-bg-color); }
 .container { width: 450px; height: 700px; background: white; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden; display: flex; flex-direction: column; }
-.content-container { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.content-container { position: relative; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; }
 .form-container { padding: 25px; box-sizing: border-box; }
 .main-container { flex-grow: 1; }
 .chat-container { height: 100%; display: flex; flex-direction: column; }
@@ -20,26 +20,25 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .header { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee; background-color: white; position: relative; }
 .back-button { background: none; border: none; font-size: 24px; cursor: pointer; margin-right: 10px; z-index: 1; }
 .chat-title { font-size: 18px; font-weight: bold; position: absolute; left: 50%; transform: translateX(-50%); margin: 0; }
-.chat-window { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; background-color: var(--main-bg-color); }
+.chat-window { flex-grow: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; background-color: var(--main-bg-color); }
 .input-area { display: flex; padding: 15px; border-top: 1px solid #eee; align-items: center; background-color: white; }
 #message-input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; margin-right: 10px; }
 #send-button { padding: 10px 15px; border: none; background-color: var(--main-color); color: white; border-radius: 20px; font-size: 14px; cursor: pointer; }
 .message-container { display: flex; margin-bottom: 15px; max-width: 80%; }
-.message-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #ccc; margin-right: 10px; display: flex; justify-content: center; align-items: center; font-weight: bold; color: white; }
+.message-avatar,.avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #ccc; margin-right: 5px !important; display: flex; justify-content: center; align-items: center; font-weight: bold; color: white; flex-shrink: 0;}
 .message-content { display: flex; flex-direction: column; }
 .message-sender { font-weight: bold; margin-bottom: 5px; font-size: 14px; }
-.message-bubble { padding: 10px 15px; border-radius: 18px; }
+.message-bubble { padding: 10px 15px; }
 .other-message { align-self: flex-start; }
-.other-message .message-bubble { background-color: var(--other-message-color); border: 1px solid #eee; }
+.other-message .message-bubble { background-color: var(--other-message-color); border: 1px solid #eee; border-radius: 5px 18px 18px 18px;}
 .my-message { align-self: flex-end; flex-direction: row-reverse; }
-.my-message .message-bubble { background-color: var(--my-message-color); }
+.my-message .message-bubble { background-color: var(--my-message-color); border-radius:18px;  }
 .my-message .message-avatar { margin-left: 10px; margin-right: 0; }
-.bubble-wrapper { display: flex; align-items: flex-end; }
 .message-time { font-size: 0.75em; color: var(--gray-color); text-align: right; }
 .system-message { text-align: center; color: var(--gray-color); font-size: 12px; margin: 10px 0; }
 .sidebar { width: 100%; padding: 0; display: flex; flex-direction: column; height: 100%; }
 .sidebar-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; position: relative;}
-.user-profile { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.user-profile { display: flex; align-items: center; gap: 10px; cursor: pointer;flex-shrink: 0; }
 #profile-picture { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background-color: #eee; }
 #username-display { font-size: 16px; font-weight: bold; }
 .sidebar-body { flex-grow: 1; overflow-y: auto; background-color: var(--main-bg-color); }
@@ -50,9 +49,11 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .create-room-area, .add-friend-area { padding: 15px; display: flex; background-color: var(--main-bg-color); }
 #room-name-input, #friend-name-input { flex-grow: 1; margin-right: 10px; }
 #add-friend-button, #create-room-button { padding: 10px 15px; }
-.tabs { display: flex; border-top: 1px solid #eee; }
-.tab { flex: 1; text-align: center; padding: 15px; cursor: pointer; background: #f9f9f9; }
-.tab.active { background: white; font-weight: bold; }
+.tabs {display: flex;border-top: 1px solid #eee;background: #f9f9f9;}
+.tab {flex: 1;padding: 15px;cursor: pointer;display: flex;align-items: center;justify-content: center;}
+.tab.active {background: white;}
+.tab i.fas {font-size: 22px !important;color: var(--gray-color);transition: color 0.2s ease;}
+.tab.active i.fas {color: var(--main-color);}
 .friend-list li .button { width: auto; padding: 5px 15px; font-size: 12px; flex-shrink: 0; }
 .friend-info { display: flex; align-items: center; gap: 12px; }
 .friend-avatar-container { position: relative; }
@@ -68,7 +69,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .chat-file-link { display: block; background-color: #f1f1f1; padding: 10px; border-radius: 8px; text-decoration: none; color: #333; margin-top: 5px; }
 .chat-file-link:hover { background-color: #e5e5e5; }
 .chat-file-link span { margin-left: 8px; }
-.language-selector-container { padding: 0 25px 15px; text-align: right; }
+.language-selector-container { position: absolute; bottom: 20px; right: 20px;z-index: 10; text-align: right; }
 #language-selector-auth { padding: 5px; border-radius: 5px; border: 1px solid #ddd; }
 #logout-button { padding: 5px 10px; font-size: 12px; width: auto; background-color: #f1f1f1; color: #333; border: 1px solid #ddd; flex-shrink: 0;}
 #logout-button:hover { background-color: #e1e1e1; }
@@ -249,13 +250,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .message-container.continuous {
     margin-top: 5px;
 }
-
-/* 다른 사람의 연속 메시지는 프로필 사진 공간만큼 들여쓰기 */
-.other-message.continuous .message-content {
-    /* 아바타 너비(40px) + 오른쪽 여백(8px) 만큼 왼쪽으로 밀어 정렬 */
-    margin-left: 48px;
-}
-
+.other-message.continuous {padding-left: 53px;}
 /* ================================== */
 /* [추가] 프로필 사진(아바타) 스타일   */
 /* ================================== */
@@ -267,19 +262,13 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     margin-right: 8px;   /* 메시지 내용과의 간격 */
     align-self: flex-start;
 }
-
-/* [수정] 연속되는 상대방 메시지는
-  프로필 사진 공간만큼 들여쓰기하여 정렬을 맞춥니다.
-*/
-.other-message.continuous .message-content {
-    margin-left: 48px; /* 아바타 너비(40px) + 오른쪽 여백(8px) */
-}
 /* ================================== */
 /* [추가] 연속 메시지 시간 표시 숨기기 */
 /* ================================== */
 
 /* 바로 뒤에 .continuous 메시지가 따라오는 메시지의 시간(.message-meta)을 숨김 */
-.message-container:has(+ .message-container.continuous) .message-meta {
+.message-container:has(+ .message-container.continuous) .message-time,
+.message-container:has(+ .message-container.continuous) .edited-indicator {
     display: none;
 }
 /* ================================== */
@@ -387,12 +376,6 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     color: var(--gray-color);
 }
 
-.bubble-wrapper {
-    position: relative;
-    display: flex;
-    align-items: flex-end;
-}
-
 .message-action-button.reply-button {
     background: transparent;
     border: none;
@@ -407,21 +390,9 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     margin-left: 8px;
 }
 
-.other-message .bubble-wrapper:hover .reply-button {
-    opacity: 1;
-}
-    /* 상대방 메시지(.other-message) 안의 메뉴 컨테이너 위치 조정 */
-.other-message .message-menu-container {
-    left: 100%;      /* 버블의 오른쪽 끝에 붙임 */
-    right: auto;     /* 기존 오른쪽 정렬을 취소 */
-    margin-left: 8px; /* 버블과 약간의 간격을 줌 */
-}
-
-/* 상대방 메시지 안의 팝업 메뉴 위치 조정 */
-.other-message .menu-options-popup {
-    left: 0;         /* 톱니바퀴 아이콘 바로 아래에서 시작 */
-    right: auto;
-}
+.other-message .bubble-wrapper:hover .reply-button {opacity: 1;}
+.other-message .message-menu-container {left: 100%;right: auto;}
+.other-message .menu-options-popup {left: 0;right: auto;}
 
 /* [추가] 저장된 번역을 보여주는 컨테이너 스타일 */
 .saved-translations-container {
@@ -735,12 +706,22 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     font-weight: 600; /* 더 굵게 */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 입체감을 주는 그림자 효과 */
 }
+#chat-filter-buttons {
+    flex-grow: 0;
+    position: absolute;
+    left: 50%;
+    top: 50%; /* (세로 중앙 정렬도 함께 처리) */
+    transform: translate(-50%, -50%);
+    display: flex;
+    justify-content: center;
+}
 .header-icons-right {
     flex-grow: 1;
     display: flex;
     align-items: center;
     gap: 8px; /* 아이콘 사이 간격 */
     justify-content: flex-end;
+    flex-shrink: 0;
 }
 #friend-search-input.search-input {
     border: 1px solid #ddd;
@@ -853,7 +834,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .auth-logo {
     display: block;
     max-width: 180px;  /* 로고 최대 너비 (조절 가능) */
-    margin: 0 auto 20px auto; /* 위 0, 좌우 auto(가운데 정렬), 아래 20px */
+    margin: 20px auto 20px auto; /* 위 0, 좌우 auto(가운데 정렬), 아래 20px */
 }
 .button-danger {
     background-color: #e74c3c; /* 빨간색 배경 */
@@ -960,4 +941,27 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     color: #888;
     white-space: nowrap; /* 줄바꿈 방지 */
     margin-left: 5px;
+}
+.message-container.other-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px; /* 👈 5px ~ 10px 사이로 원하시는 만큼 조절하세요. */
+
+    /* 이전에 추가했던 !important 코드들이 있다면
+       모두 지우고 이 코드로 대체하셔도 됩니다.
+    */
+}
+
+/* 2. 기존 "문제의 코드"를 찾아서 position: relative를 추가합니다. */
+/* (메뉴 아이콘이 이 div를 기준으로 떠다니게 하기 위함) */
+.bubble-wrapper {
+    display: flex;
+    align-items: flex-end;
+    position: relative; /* 👈 [추가] */
+}
+
+/* 3. "유령 공간"의 원인이었던 메뉴를 position: absolute로 띄웁니다. */
+.message-menu-container {
+    position: absolute; /* 👈 [추가] 이 코드가 "유령 공간"을 없앱니다. */
+    z-index: 10;        /* 👈 (선택 사항) 다른 요소 위에 뜨도록 보장합니다. */
 }

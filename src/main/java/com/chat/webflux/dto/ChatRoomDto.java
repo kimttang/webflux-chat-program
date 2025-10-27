@@ -4,8 +4,7 @@ import com.chat.webflux.chatroom.ChatRoom;
 import com.chat.webflux.message.ChatMessage;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Set;
 
 @Getter
@@ -17,8 +16,8 @@ public class ChatRoomDto {
     private final Set<String> members;
     private final LastMessageDto lastMessage; // 마지막 메시지 정보
     private final int unreadCount;
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private final LocalDateTime roomCreatedAt;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+    private final Instant roomCreatedAt;
     private final String announcement;
 
     public ChatRoomDto(ChatRoom chatRoom, ChatMessage lastMessage, int unreadCount) {
@@ -36,9 +35,7 @@ public class ChatRoomDto {
     public static class LastMessageDto {
         private final String content;
         private final ChatMessage.MessageType messageType;
-
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-        private final LocalDateTime createdAt;
+        private final Instant createdAt;
 
         public LastMessageDto(ChatMessage message) {
             this.content = (message.getMessageType() == ChatMessage.MessageType.FILE || message.getMessageType() == ChatMessage.MessageType.IMAGE) ?

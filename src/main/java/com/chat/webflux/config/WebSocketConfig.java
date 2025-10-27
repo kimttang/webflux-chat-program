@@ -12,7 +12,10 @@ import org.springframework.web.reactive.socket.server.support.WebSocketHandlerAd
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
+import static org.yaml.snakeyaml.nodes.NodeId.mapping;
 
 @Configuration
 public class WebSocketConfig {
@@ -30,20 +33,24 @@ public class WebSocketConfig {
         // 1. 기존 핸들러 맵 생성
         Map<String, WebSocketHandler> map = Map.of("/chat/**", chatWebSocketHandler);
 
-        // 2. 매핑 객체 생성
+        // 2. ✨ [수정] "NodeId"가 아닌 "SimpleUrlHandlerMapping"으로 정확히 선언
         SimpleUrlHandlerMapping mapping = new SimpleUrlHandlerMapping(map, 1);
 
-        // 3. ✨ CORS 설정 생성 및 추가
+        // 3. CORS 설정 생성 및 추가
         Map<String, CorsConfiguration> corsMap = new HashMap<>();
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(Collections.singletonList("*")); // 모든 IP 허용
+
+        // ✨ [보안 적용] "*" 대신 실제 프론트엔드 주소만 허용
+        corsConfig.setAllowedOrigins(List.of("http://localhost:8080", "http://127.0.0.1:8080"));
         corsConfig.addAllowedMethod("*");
         corsConfig.addAllowedHeader("*");
+        corsConfig.setAllowCredentials(true);
 
-        corsMap.put("/chat/**", corsConfig); // "/chat/**" 경로에 이 CORS 설정 적용
+        corsMap.put("/chat/**", corsConfig);
+
         mapping.setCorsConfigurations(corsMap);
 
-        return mapping; // 4. 설정이 적용된 매핑 반환
+        return mapping;
     }
 
     @Bean

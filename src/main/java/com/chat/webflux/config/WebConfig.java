@@ -14,18 +14,17 @@ public class WebConfig implements WebFluxConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // /uploads/** URL 요청을 file:///path/to/your/uploads/ 경로의 파일로 매핑합니다.
-        // File.separator를 사용하여 OS에 맞는 경로 구분자를 사용하도록 수정
         String resourceLocation = "file:" + uploadDir + (uploadDir.endsWith("/") ? "" : "/");
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(resourceLocation);
     }
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")      // 모든 경로(/api/**)에 대해
-                .allowedOrigins("*")  // 모든 IP 주소에서의 접속을 허용
+        registry.addMapping("/**")  // 모든 경로(/api/**)에 대해 실제 프론트엔드 주소만 허용
+                .allowedOrigins("http://localhost:8080", "http://127.0.0.1:8080")
                 .allowedMethods("*")  // 모든 HTTP 메서드(GET, POST 등) 허용
                 .allowedHeaders("*")  // 모든 헤더 허용
+                .allowCredentials(true) //인증 정보(쿠키 등) 허용
                 .maxAge(3600);
     }
 }

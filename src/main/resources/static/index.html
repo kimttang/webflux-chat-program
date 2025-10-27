@@ -46,13 +46,19 @@
                     <img id="profile-picture" src="" alt="Profile Picture">
                     <span id="username-display"></span>
                 </div>
+                <div id="chat-filter-buttons" class="filter-buttons hidden">
+                    <button id="show-all-chats-button" class="filter-button active">전체</button>
+                    <button id="show-unread-chats-button" class="filter-button">안읽음</button>
+                </div>
                 <div class="header-icons-right">
                     <input type="text" id="friend-search-input" class="search-input hidden" placeholder="닉네임으로 검색...">
                     <div id="default-header-icons" class="icon-group">
-                        <div id="chat-filter-buttons" class="filter-buttons hidden">
-                            <button id="show-all-chats-button" class="filter-button active">전체</button>
-                            <button id="show-unread-chats-button" class="filter-button">안읽음</button>
-                        </div>
+                        <button id="show-create-room-button" class="icon-button hidden" title="새 채팅방">
+                            <i class="fas fa-comment-medical"></i>
+                        </button>
+                        <button id="show-add-friend-button" class="icon-button hidden" title="친구 추가">
+                            <i class="fas fa-user-plus"></i>
+                        </button>
                         <button id="show-friend-search-button" class="icon-button">
                             <i class="fas fa-search"></i>
                         </button>
@@ -67,7 +73,7 @@
                     <div id="calendar-view" style="height: 100%;"></div>
                 </div>
             </div>
-            <div id="friends-action-area">
+            <div id="friends-action-area" class="hidden">
                 <div class="add-friend-area"><input type="text" id="friend-name-input"><button id="add-friend-button" class="button"></button></div>
             </div>
             <div id="chatrooms-action-area" class="hidden">
@@ -81,9 +87,9 @@
                 </button>
             </div>
             <div class="tabs">
-                <div class="tab active" data-tab="friends" id="friends-tab-button"></div>
-                <div class="tab" data-tab="chatrooms" id="chatrooms-tab-button"></div>
-                <div class="tab" data-tab="calendar" id="calendar-tab-button"></div>
+                <div class="tab active" data-tab="friends" id="friends-tab-button"><i class="fas fa-user"></i></div>
+                <div class="tab" data-tab="chatrooms" id="chatrooms-tab-button"><i class="fas fa-comment"></i></div>
+                <div class="tab" data-tab="calendar" id="calendar-tab-button"><i class="fas fa-calendar"></i></div>
             </div>
         </div>
     </div>

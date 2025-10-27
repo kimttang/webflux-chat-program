@@ -7,7 +7,7 @@ import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -30,8 +30,7 @@ public class ChatMessage {
     private String sender;
     private String content;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     private MessageType messageType;
     private String fileUrl;
     private boolean edited = false;
@@ -46,7 +45,7 @@ public class ChatMessage {
         this.sender = sender;
         this.content = content;
         this.messageType = MessageType.TEXT;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Instant.now();
         this.readBy.add(sender);
     }
 
@@ -57,7 +56,7 @@ public class ChatMessage {
         this.content = content;
         this.fileUrl = fileUrl;
         this.messageType = messageType;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Instant.now();
         this.readBy.add(sender);
     }
 }

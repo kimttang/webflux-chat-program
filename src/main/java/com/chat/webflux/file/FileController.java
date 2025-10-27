@@ -80,21 +80,27 @@ public class FileController {
                                             .map(user -> new ChatMessageDto(savedMessage, user))
                             )
                             .flatMap(chatMessageDto -> {
+                                // 1. (웹소켓) 채팅방 내부에는 메시지를 즉시 방송
                                 OutgoingMessage outgoingMessage = OutgoingMessage.forChatMessage(chatMessageDto);
                                 chatWebSocketHandler.broadcastMessage(roomId, outgoingMessage);
+
+                                // 2. (SSE) 채팅방 "목록" 갱신 로직
                                 return chatRoomRepository.findById(roomId)
-                                        .flatMap(chatRoom ->
-                                                Flux.fromIterable(chatRoom.getMembers())
-                                                        // 5. 핸들러의 public 메서드 사용
-                                                        .filter(member -> !member.equals(sender) && !chatWebSocketHandler.isUserPresent(roomId, member))
-                                                        .flatMap(member -> unreadCountService.incrementUnreadCount(member, roomId))
-                                                        .then(Mono.just(chatRoom))
-                                        )
-                                        .doOnSuccess(chatRoom -> {
-                                            // 6. [핵심] 채팅방 목록(SSE) 갱신
-                                            if (chatRoom != null) {
-                                                chatRoomService.broadcastToAllMembers(chatRoom);
-                                            }
+                                        .flatMap(chatRoom -> {
+
+                                            //  "안 읽음 숫자 1 증가" 작업을 Mono<Void>로 정의
+                                            Mono<Void> incrementMono = Flux.fromIterable(chatRoom.getMembers())
+                                                    .filter(member -> !member.equals(sender) && !chatWebSocketHandler.isUserPresent(roomId, member))
+                                                    .flatMap(member -> unreadCountService.incrementUnreadCount(member, roomId)) // (A) DB Write
+                                                    .then(); // <-- 모든 DB 저장이 끝날 때까지 기다림
+
+                                            // "안 읽음" 저장이 "모두" 완료된 "후에"(.then) SSE 갱신 실행
+                                            return incrementMono
+                                                    .then(Mono.fromRunnable(() -> {
+                                                        log.info("[SSE Broadcast] 파일 업로드로 인한 목록 갱신 (Room: {})", chatRoom.getId());
+                                                        // 이 시점엔 DB Write가 완료되었으므로, broadcast가 정확한 숫자를 읽음
+                                                        chatRoomService.broadcastToAllMembers(chatRoom);
+                                                    }));
                                         })
                                         .then(); // Mono<Void> 반환
                             })

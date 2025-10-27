@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import org.springframework.dao.DuplicateKeyException;
 
 @RestController
 @RequestMapping("/api/dm")
@@ -42,26 +43,31 @@ public class DirectMessageController {
                 .sorted()
                 .collect(Collectors.joining("-"));
 
-        // 두 사용자의 정보를 DB에서 조회
         Mono<User> fromUserMono = userRepository.findByUsername(fromUser);
         Mono<User> toUserMono = userRepository.findByUsername(toUser);
 
-        // Mono.zip을 사용하여 두 Mono가 모두 완료될 때까지 기다림
         return Mono.zip(fromUserMono, toUserMono)
                 .flatMap(tuple -> {
                     User user1 = tuple.getT1();
                     User user2 = tuple.getT2();
 
-                    // 아이디 대신 닉네임으로 채팅방 이름 설정
                     String roomName = String.format("%s & %s", user1.getNickname(), user2.getNickname());
 
-                    // 기존 로직 수행
+                    // 3. [수정] "경쟁 상태" 방지 로직
                     return chatRoomRepository.findById(roomId)
                             .switchIfEmpty(Mono.defer(() -> {
+                                // 3-1. (시도) 방이 없으므로 "새로 저장"
                                 ChatRoom newRoom = new ChatRoom(roomId, roomName, fromUser, toUser);
                                 return chatRoomRepository.save(newRoom)
-                                        .doOnSuccess(room -> chatRoomService.broadcastToAllMembers(room));
+                                        .doOnSuccess(room -> chatRoomService.broadcastToAllMembers(room))
+
+                                        // 3-2. (방어) "중복 키 오류"가 나면 (즉, 동시에 생성됐다면)
+                                        .onErrorResume(DuplicateKeyException.class, e ->
+                                                // 3-3. 이미 생성된 그 방을 "다시 조회"해서 반환
+                                                chatRoomRepository.findById(roomId)
+                                        );
                             }));
-                });
+                })
+                .switchIfEmpty(Mono.error(new RuntimeException("1:1 채팅 생성 실패: 사용자 정보를 찾을 수 없습니다.")));
     }
 }

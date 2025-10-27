@@ -6,7 +6,7 @@ import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -21,7 +21,7 @@ public class ChatRoom {
     private String name;
     private String profilePictureUrl;
     private String createdBy;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     private Set<String> members = new HashSet<>();
     private String announcement;
 
@@ -29,7 +29,7 @@ public class ChatRoom {
     public ChatRoom(String name, String createdBy) {
         this.name = name;
         this.createdBy = createdBy;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Instant.now();
         this.members.add(createdBy);
     }
 
@@ -38,7 +38,7 @@ public class ChatRoom {
         this.id = id;
         this.name = name;
         this.createdBy = fromUser;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Instant.now();
         this.members.add(fromUser);
         this.members.add(toUser);
     }

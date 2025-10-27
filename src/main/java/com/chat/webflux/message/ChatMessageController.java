@@ -28,18 +28,13 @@ public class ChatMessageController {
 
     @GetMapping("/{roomId}/messages")
     public Flux<ChatMessageDto> getMessagesByRoom(@PathVariable String roomId,
-                                                  @RequestHeader("X-Username") String encodedUsername) { // [2. 변수명 변경]
-
-        // [3. 디코딩 로직 추가]
+                                                  @RequestHeader("X-Username") String encodedUsername) {
         final String username;
         try {
-            // UTF-8을 사용해 한글/특수문자를 원래대로 복원합니다.
             username = URLDecoder.decode(encodedUsername, StandardCharsets.UTF_8);
         } catch (Exception e) {
             return Flux.error(new IllegalArgumentException("Invalid username encoding"));
         }
-        // [여기까지 추가]
-
 
         return chatRoomRepository.findById(roomId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("존재하지 않는 채팅방입니다.")))
@@ -51,7 +46,6 @@ public class ChatMessageController {
 
                     int totalMembers = chatRoom.getMembers().size();
 
-                    // --- (이하는 제공해주신 기존 로직과 동일) ---
                     return chatMessageRepository.findByRoomIdOrderByCreatedAtAsc(roomId)
                             .collectList() // 1. 먼저 모든 메시지를 리스트로 가져옵니다.
                             .flatMapMany(messages -> {
@@ -104,30 +98,74 @@ public class ChatMessageController {
                             });
                 });
     }
+
+    // 검색 API
     @GetMapping("/{roomId}/messages/search")
     public Flux<ChatMessageDto> searchMessages(
             @PathVariable String roomId,
             @RequestParam String keyword) {
 
         return chatMessageRepository.findByRoomIdAndSearchKeyword(roomId, keyword)
-                .flatMap(message ->
-                        userService.findByUsername(message.getSender())
-                                .map(user -> new ChatMessageDto(message, user))
-                                .defaultIfEmpty(new ChatMessageDto(message, message.getSender()))
-                );
+                .collectList() // 검색 결과를 "한 번에" 리스트로 모음
+                .flatMapMany(messages -> {
+                    if (messages.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    // 필요한 유저 ID만 "중복 없이" 추출
+                    List<String> senderIds = messages.stream()
+                            .map(ChatMessage::getSender)
+                            .distinct()
+                            .toList();
+
+                    // 유저 정보를 "한 번에" 맵으로 가져옴
+                    Mono<Map<String, User>> usersMapMono = userRepository.findByUsernameIn(senderIds)
+                            .collectMap(User::getUsername, Function.identity());
+
+                    // "DB 조회 없이" 메모리에서 조합
+                    return usersMapMono
+                            .flatMapMany(usersMap -> {
+                                List<ChatMessageDto> dtos = messages.stream().map(msg -> {
+                                    User sender = usersMap.get(msg.getSender());
+                                    return (sender != null) ?
+                                            new ChatMessageDto(msg, sender) :
+                                            new ChatMessageDto(msg, msg.getSender());
+                                }).toList();
+                                return Flux.fromIterable(dtos);
+                            });
+                });
     }
 
-    // 특정 채팅방의 모든 파일/이미지 목록 (갤러리) 조회
+    //갤러리 API (N+1 문제 해결)
     @GetMapping("/{roomId}/gallery")
     public Flux<ChatMessageDto> getRoomGallery(@PathVariable String roomId) {
 
-        // 1. 1단계에서 만든 쿼리 메서드 호출
         return chatMessageRepository.findByRoomIdAndFileUrlIsNotNullOrderByCreatedAtDesc(roomId)
-                .flatMap(message ->
-                        // 2. 메시지 DTO로 변환 (기존 검색 로직과 동일)
-                        userService.findByUsername(message.getSender())
-                                .map(user -> new ChatMessageDto(message, user))
-                                .defaultIfEmpty(new ChatMessageDto(message, message.getSender()))
-                );
+                .collectList() //갤러리 결과를 "한 번에" 리스트로 모음
+                .flatMapMany(messages -> {
+                    if (messages.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    //필요한 유저 ID만 "중복 없이" 추출
+                    List<String> senderIds = messages.stream()
+                            .map(ChatMessage::getSender)
+                            .distinct()
+                            .toList();
+
+                    //유저 정보를 "한 번에" 맵으로 가져옴
+                    Mono<Map<String, User>> usersMapMono = userRepository.findByUsernameIn(senderIds)
+                            .collectMap(User::getUsername, Function.identity());
+
+                    //"DB 조회 없이" 메모리에서 조합
+                    return usersMapMono
+                            .flatMapMany(usersMap -> {
+                                List<ChatMessageDto> dtos = messages.stream().map(msg -> {
+                                    User sender = usersMap.get(msg.getSender());
+                                    return (sender != null) ?
+                                            new ChatMessageDto(msg, sender) :
+                                            new ChatMessageDto(msg, msg.getSender());
+                                }).toList();
+                                return Flux.fromIterable(dtos);
+                            });
+                });
     }
 }

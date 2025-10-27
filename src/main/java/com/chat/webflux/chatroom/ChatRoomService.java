@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -88,13 +89,13 @@ public class ChatRoomService {
                     // 4. DTO 리스트를 마지막 메시지 시간 순으로 정렬합니다. (기존 로직과 동일)
                     chatRoomDtos.sort((dto1, dto2) -> {
                         // 정렬 기준 시간 (1순위: 마지막 메시지 시간, 2순위: 채팅방 생성 시간)
-                        LocalDateTime time1 = (dto1.getLastMessage() != null)
+                        Instant time1 = (dto1.getLastMessage() != null)
                                 ? dto1.getLastMessage().getCreatedAt()
-                                : dto1.getRoomCreatedAt(); // 1단계에서 DTO에 추가한 필드 사용
+                                : dto1.getRoomCreatedAt(); // 4단계에서 Instant로 바꿈
 
-                        LocalDateTime time2 = (dto2.getLastMessage() != null)
+                        Instant time2 = (dto2.getLastMessage() != null)
                                 ? dto2.getLastMessage().getCreatedAt()
-                                : dto2.getRoomCreatedAt(); // 1단계에서 DTO에 추가한 필드 사용
+                                : dto2.getRoomCreatedAt(); // 4단계에서 Instant로 바꿈
 
                         // null 체크 (데이터 안정성)
                         if (time1 == null && time2 == null) return 0;

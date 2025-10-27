@@ -248,22 +248,26 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                                                 .subscribe();
                                     }
                                     return chatRoomRepository.findById(roomId)
-                                            .flatMap(chatRoom ->
-                                                    Flux.fromIterable(chatRoom.getMembers())
-                                                            // 접속 안 한 다른 멤버 필터링
-                                                            .filter(member -> !member.equals(username) && !isUserPresent(roomId, member))
-                                                            // [기능 누락 수정] 안 읽음 카운트 증가
-                                                            .flatMap(member -> unreadCountService.incrementUnreadCount(member, roomId))
-                                                            .then(Mono.just(chatRoom))
-                                            )
-                                            .doOnSuccess(chatRoom -> {
-                                                if (chatRoom != null) {
-                                                    // [기능 누락 수정] 목록 갱신 트리거
-                                                    chatRoomService.broadcastToAllMembers(chatRoom);
-                                                }
+                                            .flatMap(chatRoom -> {
+
+                                                // "안 읽음 숫자 1 증가" 작업을 Mono<Void>로 정의
+                                                Mono<Void> incrementMono = Flux.fromIterable(chatRoom.getMembers())
+                                                        .filter(member -> !member.equals(username)) // 보낸 사람 제외
+                                                        .filter(member -> !isUserPresent(roomId, member))  // 채팅방에 없는 사람만
+                                                        .flatMap(member -> unreadCountService.incrementUnreadCount(member, roomId)) // (A) DB Write
+                                                        .then(); // <-- 모든 DB 저장이 끝날 때까지 기다림
+
+                                                //  "안 읽음" 저장이 "모두" 완료된 "후에"(.then) SSE 갱신 실행
+                                                return incrementMono
+                                                        .then(Mono.fromRunnable(() -> {
+                                                            log.info("[SSE Broadcast] 텍스트 메시지로 인한 목록 갱신 (Room: {})", chatRoom.getId());
+                                                            // 이 시점엔 DB Write가 완료되었으므로, broadcast가 정확한 숫자를 읽음
+                                                            chatRoom.getMembers().forEach(chatRoomService::broadcastRoomListToUser);
+                                                        }));
                                             });
                                 })
-                ).then(); // Mono<Void> 반환
+                )
+                .then(); // Mono<Void> 반환
 
 
     }
