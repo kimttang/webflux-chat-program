@@ -24,6 +24,8 @@ let onlineFriendsCache = new Set();
 let currentRoomAnnouncement = null;
 let messageToAnnounce = null;
 let isAnnouncementManuallyHidden = false;
+let currentLastDisplayedDate = null;
+
 
 const DEFAULT_PROFILE_PICTURE = "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png";
 const userCache = new Map();
@@ -56,7 +58,6 @@ const translations = {
     langZh: { ko: '중국어', en: 'Chinese', ja: '中国語', zh: '中文', ar: 'الصينية' },
     langAr: { ko: '아랍어', en: 'Arabic', ja: 'アラビア語', zh: '阿拉伯语', ar: 'العربية' },
     messagePlaceholder: { ko: '메시지 입력...', en: 'Enter message...', ja: 'メッセージを入力...', zh: '输入消息...', ar: 'أدخل رسالة...' },
-    sendButton: { ko: '전송', en: 'Send', ja: '送信', zh: '发送', ar: 'إرسال' },
     inviteButton: { ko: '초대', en: 'Invite', ja: '招待', zh: '邀请', ar: 'دعوة' },
     leaveButton: { ko: '나가기', en: 'Leave', ja: '退出', zh: '离开', ar: 'مغادرة' },
 
@@ -119,6 +120,7 @@ const DOM = {
     chatWindow: document.getElementById('chat-window'),
     messageInput: document.getElementById('message-input'),
     sendButton: document.getElementById('send-button'),
+    translateButton: document.getElementById('translate-button'),
      inviteButton: document.getElementById('invite-user-button'),
      leaveButton: document.getElementById('leave-room-button'),
     languageSelect: document.getElementById('language-select'),
@@ -206,8 +208,17 @@ DOM.showLogin.addEventListener('click', (e) => { e.preventDefault(); DOM.signupF
 DOM.logoutButton.addEventListener('click', showAuthScreen);
 DOM.hideAnnouncementBtn.addEventListener('click', hideAnnouncementBar);
 DOM.showAnnouncementBtn.addEventListener('click', showAnnouncementBar);
-
-
+const updateSendButtonVisibility = () => {
+    if (DOM.messageInput.value.trim().length > 0) {
+        DOM.sendButton.classList.add('visible'); // 내용이 있으면 .visible 추가
+    } else {
+        DOM.sendButton.classList.remove('visible'); // 내용이 없으면 .visible 제거
+    }
+};
+if (DOM.messageInput) {
+    DOM.messageInput.addEventListener('input', updateSendButtonVisibility);
+    updateSendButtonVisibility();
+}
 DOM.loginButton.addEventListener('click', async () => {
     const username = DOM.loginUsernameInput.value; const password = DOM.loginPasswordInput.value;
     try {
@@ -223,7 +234,12 @@ DOM.signupButton.addEventListener('click', async () => {
         if (response.ok) { showAlert('alertSignupSuccess'); DOM.signupForm.classList.add('hidden'); DOM.loginForm.classList.remove('hidden'); DOM.loginUsernameInput.value = username; DOM.loginPasswordInput.value = ''; } else { const error = await response.text(); DOM.signupError.textContent = error; DOM.signupError.classList.remove('hidden'); }
     } catch (error) { DOM.signupError.textContent = '회원가입 중 오류 발생'; DOM.signupError.classList.remove('hidden'); }
 });
-
+if (DOM.translateButton) {
+    DOM.translateButton.addEventListener('click', () => {
+        DOM.languageSelect?.classList.toggle('visible');
+        DOM.translateButton.classList.toggle('active');
+    });
+}
 DOM.tabs.forEach(tab => {
     tab.addEventListener('click', () => {
         // 1. 모든 탭에서 'active' 클래스 제거
@@ -313,7 +329,9 @@ DOM.createRoomButton.addEventListener('click', async () => {
 });
 
 DOM.backToMain.addEventListener('click', () => { if (websocket) websocket.close(); showMainScreen(); });
-DOM.sendButton.addEventListener('click', sendMessage);
+if (DOM.sendButton) {
+    DOM.sendButton.addEventListener('click', sendMessage);
+}
 DOM.cancelReplyButton.addEventListener('click', cancelReply);
 DOM.messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } });
 DOM.messageInput.addEventListener('input', () => { clearTimeout(typingTimeout); if (DOM.messageInput.value.trim() !== '') { sendTypingStart(); typingTimeout = setTimeout(sendTypingEnd, 3000); } else { sendTypingEnd(); } });
@@ -621,7 +639,7 @@ async function openGalleryModal(roomId) {
                 const imgLink = document.createElement('a');
                 imgLink.href = msg.fileUrl;
                 imgLink.target = '_blank';
-                imgLink.title = msg.content || `이미지 (${msg.sender.username})`;
+                imgLink.title = msg.content || `이미지`;
 
                 const img = document.createElement('img');
                 img.src = msg.fileUrl; // (썸네일이 필요하면 썸네일 URL 사용)
@@ -643,16 +661,16 @@ async function openGalleryModal(roomId) {
                 link.download = msg.content || ''; // 원본 파일명으로 다운로드
 
                 // (보낸 사람, 날짜 등 추가 정보)
-                const senderSpan = document.createElement('span');
-                senderSpan.className = 'file-sender';
-                senderSpan.textContent = ` | by ${msg.sender.username}`;
+                //    const senderSpan = document.createElement('span');
+                //    senderSpan.className = 'file-sender';
+                //   senderSpan.textContent = ` | by ${msg.sender.senderNickname}`;
 
                 const dateSpan = document.createElement('span');
                 dateSpan.className = 'file-date';
                 dateSpan.textContent = ` | ${new Date(msg.createdAt).toLocaleDateString()}`;
 
                 fileDiv.appendChild(link);
-                fileDiv.appendChild(senderSpan);
+            //    fileDiv.appendChild(senderSpan);
                 fileDiv.appendChild(dateSpan);
                 DOM.galleryFilesContent.appendChild(fileDiv);
             }
@@ -939,6 +957,8 @@ async function showChatScreen(roomId, roomName, announcement) {
     leaveButton.addEventListener('click', leaveCurrentRoom);
 
     DOM.chatWindow.innerHTML = '';
+    resetMessageGrouping(); //  (메시지 연속성 초기화)
+    currentLastDisplayedDate = null; // (날짜 구분선 초기화)
     await fetchParticipants(roomId);
     setupIntersectionObserver();
     connectWebSocket(roomId);
@@ -1159,6 +1179,14 @@ function listenToPresenceUpdates() {
                     const readByCount = msg.readBy ? msg.readBy.length : 1;
                     msg.unreadCount = totalMembers - readByCount;
                     if (msg.unreadCount < 0) msg.unreadCount = 0;
+                    const currentMessageKSTDate = getKSTDateString(msg.createdAt);
+                    // 2. 마지막으로 표시된 KST 날짜와 비교합니다.
+                    if (currentMessageKSTDate !== currentLastDisplayedDate) {
+                        // 3. 날짜가 다르면, 날짜 구분선을 먼저 추가합니다.
+                        DOM.chatWindow.appendChild(createDateSeparatorElement(msg.createdAt));
+                        // 4. 마지막 표시 날짜를 지금 날짜로 업데이트합니다.
+                        currentLastDisplayedDate = currentMessageKSTDate;
+                    }
                     const newMessageElement = displayMessage(msg);
                     DOM.chatWindow.appendChild(newMessageElement);
                     DOM.chatWindow.scrollTop = DOM.chatWindow.scrollHeight;
@@ -1233,6 +1261,7 @@ function sendMessage() {
 
     // 4. 입력창을 비우고, 답장 상태를 초기화합니다.
     DOM.messageInput.value = '';
+    DOM.sendButton.classList.remove('visible');
     cancelReply(); // 답장 바를 숨기고 ID를 초기화하는 함수 호출
 
     // 5. 기존과 동일하게 타이핑 종료 이벤트를 처리합니다.
@@ -1254,9 +1283,18 @@ async function loadPreviousMessages() {
             return;
         }
         const messages = await response.json();
-        DOM.chatWindow.innerHTML = '';
 
         messages.forEach(msgDto => {
+            // 1. 현재 메시지의 KST 날짜를 가져옵니다.
+            const currentMessageKSTDate = getKSTDateString(msgDto.createdAt);
+
+            // 2. 마지막으로 표시된 KST 날짜와 비교합니다.
+            if (currentMessageKSTDate !== currentLastDisplayedDate) {
+                // 3. 날짜가 다르면, 날짜 구분선을 먼저 추가합니다.
+                DOM.chatWindow.appendChild(createDateSeparatorElement(msgDto.createdAt));
+                // 4. 마지막 표시 날짜를 지금 날짜로 업데이트합니다.
+                currentLastDisplayedDate = currentMessageKSTDate;
+            }
             const messageElement = displayMessage(msgDto);
             DOM.chatWindow.appendChild(messageElement);
         });
@@ -1339,6 +1377,9 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
     messageContent.className = 'message-content';
     const bubbleWrapper = document.createElement('div');
     bubbleWrapper.className = 'bubble-wrapper';
+    if (msg.messageType === 'IMAGE' || msg.messageType === 'FILE') {
+        bubbleWrapper.classList.add('no-bubble');
+    }
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble';
 
@@ -2135,7 +2176,6 @@ function renderCalendar() {
     const calendarEl = document.getElementById('calendar-view');
 
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
-        // (기존 옵션)
         initialView: 'dayGridMonth',
         headerToolbar: {
             left: 'prev,next today',
@@ -2222,19 +2262,18 @@ function renderRoomCalendar(roomId) {
     const calendarEl = DOM.roomCalendarView;
 
     roomCalendarInstance = new FullCalendar.Calendar(calendarEl, {
-        // (기존 옵션)
+        displayEventTime: true,
         initialView: 'dayGridMonth',
         locale: 'ko',
-        height: '450px',
+        height: '610px',
         eventDisplay: 'block',
+        eventClassNames: 'custom-room-event',
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
             right: 'dayGridMonth,listWeek'
         },
-        events: '/api/calendar/room/' + roomId, // 공용 일정 (R)
-
-        // --- ✨ [신규 UD] ---
+        events: '/api/calendar/room/' + roomId, // 공용 일정
 
         // [U] 1. 일정을 마우스로 드래그할 수 있게 허용 (공용)
         editable: true,
@@ -2319,9 +2358,41 @@ function renderRoomCalendar(roomId) {
                     }
                 }
             }
-            // (1 또는 2 외의 값은 무시)
-        }
+        },
+
     });
 
     roomCalendarInstance.render();
+}
+/**
+ * [신규] ISO 타임스탬프를 KST 기준의 'YYYY-MM-DD' 문자열로 변환합니다.
+ * @param {string} isoString - "2025-10-21T09:36:25.377+00:00" 형식의 UTC 타임스탬프
+ * @returns {string} "2025-10-22" 형식의 KST 날짜 문자열
+ */
+function getKSTDateString(isoString) {
+    const date = new Date(isoString);
+    // 'sv-SE' 로케일은 'YYYY-MM-DD' 형식을 보장합니다.
+    return date.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+}
+
+/**
+ * [신규] 날짜 구분선 DOM 요소를 생성합니다.
+ * @param {string} isoString - KST로 변환할 ISO 타임스탬프
+ * @returns {HTMLElement} <div class="date-separator">...</div>
+ */
+function createDateSeparatorElement(isoString) {
+    const date = new Date(isoString);
+    const options = {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long',
+        timeZone: 'Asia/Seoul'
+    };
+    const formattedDate = `🗓️ ${date.toLocaleDateString('ko-KR', options)} >`;
+
+    const separator = document.createElement('div');
+    separator.className = 'date-separator';
+    separator.innerHTML = `<span>${formattedDate}</span>`;
+    return separator;
 }

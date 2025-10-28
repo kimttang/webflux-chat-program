@@ -1,5 +1,6 @@
 package com.chat.webflux.calendar;
 
+import com.chat.webflux.chatroom.ChatRoom;
 import lombok.RequiredArgsConstructor;
 import com.chat.webflux.chatroom.ChatRoomRepository;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,6 +54,11 @@ public class CalendarEventController {
         private String start;  // (JS가 보낼) 새 시작 시간 (드래그)
     }
 
+    @lombok.Data
+    private static class CreateEventDto {
+        private String title;
+        private String start; // "2025-10-29T12:00:00Z" (ISO 8601 형식)
+    }
     // "개인" 캘린더 조회 API
 
     @GetMapping("/personal/{userId}")
@@ -110,6 +116,30 @@ public class CalendarEventController {
         return calendarEventRepository.save(newEvent);
     }
 
+    @PostMapping("/ROOM/{roomId}")
+    public Mono<CalendarEvent> createRoomEvent(
+            @PathVariable String roomId,
+            @RequestParam("userId") String userId,
+            @RequestBody CreateEventDto dto) {
+
+        // 1. 권한 확인: 이 유저가 채팅방 멤버가 맞는지?
+        // (ChatRoomRepository는 이미 @RequiredArgsConstructor로 주입되어 있음)
+        Mono<ChatRoom> roomCheck = chatRoomRepository.findById(roomId)
+                .filter(room -> room.getMembers().contains(userId))
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "채팅방 멤버만 일정을 추가할 수 있습니다.")));
+
+        // 2. 권한 확인이 성공하면(.then) 일정 생성 로직 실행
+        return roomCheck.then(Mono.fromCallable(() -> {
+                    CalendarEvent newEvent = new CalendarEvent();
+                    newEvent.setTitle(dto.getTitle());
+                    newEvent.setStart(Instant.parse(dto.getStart())); // DTO의 start string을 Instant로 변환
+                    newEvent.setScope("ROOM");
+                    newEvent.setOwnerId(roomId); // 이 일정의 주인은 "채팅방"
+                    return newEvent;
+                }))
+                .flatMap(calendarEventRepository::save); // 3. DB에 저장
+    }
+
     //D (삭제) API
     @DeleteMapping("/{eventId}")
     public Mono<ResponseEntity<Void>> deleteEvent( // ✨ 1. 반환 타입을 Mono<ResponseEntity<Void>>로 변경
@@ -119,14 +149,7 @@ public class CalendarEventController {
         // 1. DB에서 삭제할 이벤트를 찾음
         return calendarEventRepository.findById(eventId)
                 .flatMap(event -> {
-
-                    // 2. [임시] 권한 확인 (주석 처리된 상태)
                     Mono<Void> permissionCheck = Mono.empty();
-                    /*
-                    if ("PERSONAL".equals(event.getScope())) { ... }
-                    else if ("ROOM".equals(event.getScope())) { ... }
-                    */
-
                     // 3. ✨ [로직 수정] 삭제 후, 명시적으로 "200 OK" 응답 반환
                     return permissionCheck
                             .then(calendarEventRepository.delete(event))
@@ -138,11 +161,7 @@ public class CalendarEventController {
     }
 
 
-    /**
-     * ===================================================================
-     * U (수정) API (권한 확인 "임시 주석")
-     * ===================================================================
-     */
+    //(수정) API
     @PutMapping("/{eventId}")
     public Mono<CalendarEvent> updateEvent(
             @PathVariable String eventId,
@@ -155,32 +174,6 @@ public class CalendarEventController {
 
                     // 2. [임시 수정] 권한 확인 로직을 "전부" 주석 처리 (테스트용)
                     Mono<Void> permissionCheck = Mono.empty(); // (무조건 통과)
-
-                    /*
-                    if ("PERSONAL".equals(event.getScope())) {
-                        if (event.getOwnerId().equals(userId)) {
-                            permissionCheck = Mono.empty();
-                        } else {
-                            permissionCheck = Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "개인 일정 수정 권한이 없습니다."));
-                        }
-                    }
-                    else if ("ROOM".equals(event.getScope())) {
-                        String roomId = event.getOwnerId();
-                        permissionCheck = chatRoomRepository.findById(roomId)
-                            .flatMap(room -> {
-                                if (room.getMembers().contains(userId)) {
-                                    return Mono.empty();
-                                } else {
-                                    return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "공용 일정 수정 권한이 없습니다."));
-                                }
-                            })
-                            .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다.")))
-                            .then();
-                    }
-                    else {
-                        permissionCheck = Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "알 수 없는 일정 타입입니다."));
-                    }
-                    */
 
                     // 3. 권한 확인이 성공했을 때만(.then) 수정 로직 실행
                     return permissionCheck.then(Mono.fromCallable(() -> {

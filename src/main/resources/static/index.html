@@ -134,11 +134,12 @@
             <button id="cancel-reply-button" class="cancel-reply-btn">&times;</button>
         </div>
         <div class="input-area">
-            <input type="file" id="file-input" class="hidden"><button id="upload-button" class="upload-button">📎</button>
+            <input type="file" id="file-input" class="hidden"><button id="upload-button" class="upload-button"><i class="fas fa-file-medical"></i></button>
+            <button id="translate-button"><i class="fas fa-language"></i></button>
             <select id="language-select">
                 <option id="lang-none" value=""></option><option id="lang-en" value="en"></option><option id="lang-ja" value="ja"></option><option id="lang-zh" value="zh"></option><option id="lang-ar" value="ar"></option>
             </select>
-            <input type="text" id="message-input"><button id="send-button" class="button"></button>
+            <input type="text" id="message-input"><button id="send-button"><i class="fas fa-paper-plane"></i></button>
         </div>
     </div>
 </div>
@@ -214,7 +215,7 @@
     </div>
 </div>
 <div id="room-calendar-overlay" class="overlay hidden">
-    <div id="room-calendar-modal" class="modal">
+    <div id="room-calendar-modal" class="modal modal-large">
         <div class="modal-header">
             <h2 id="room-calendar-title">채팅방 공용 캘린더</h2>
             <button id="close-room-calendar-modal" class="close-button">&times;</button>

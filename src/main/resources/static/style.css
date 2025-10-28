@@ -23,7 +23,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .chat-window { flex-grow: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; background-color: var(--main-bg-color); }
 .input-area { display: flex; padding: 15px; border-top: 1px solid #eee; align-items: center; background-color: white; }
 #message-input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; margin-right: 10px; }
-#send-button { padding: 10px 15px; border: none; background-color: var(--main-color); color: white; border-radius: 20px; font-size: 14px; cursor: pointer; }
+#send-button {border: none;background-color: var(--main-color);color: white;cursor: pointer; width: 40px;height: 40px;border-radius: 50%;padding: 0;display: flex;align-items: center;justify-content: center;font-size: 16px;opacity: 0;visibility: hidden;transform: scale(0.5);transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;flex-shrink: 0;}
 .message-container { display: flex; margin-bottom: 15px; max-width: 80%; }
 .message-avatar,.avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #ccc; margin-right: 5px !important; display: flex; justify-content: center; align-items: center; font-weight: bold; color: white; flex-shrink: 0;}
 .message-content { display: flex; flex-direction: column; }
@@ -64,7 +64,9 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .translated-message { color: #0366d6; font-style: italic; margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ddd; }
 .typing-indicator { color: var(--gray-color); font-size: 12px; height: 18px; padding: 0 15px; background-color: var(--main-bg-color); }
 #language-select { padding: 8px; border-radius: 5px; border: 1px solid #ddd; margin-right: 10px; }
-.upload-button { font-size: 20px; background: none; border: none; cursor: pointer; margin-right: 10px; color: #555; }
+#upload-button {background: transparent;border: none;padding: 0; width: 40px;height: 40px;display: flex;align-items: center;justify-content: center;color: var(--gray-color);cursor: pointer;transition: color 0.2s ease;}
+#upload-button i {font-size: 18px;}
+#upload-button:hover {color: var(--main-color);}
 .chat-image { max-width: 100%; border-radius: 10px; margin-top: 5px; }
 .chat-file-link { display: block; background-color: #f1f1f1; padding: 10px; border-radius: 8px; text-decoration: none; color: #333; margin-top: 5px; }
 .chat-file-link:hover { background-color: #e5e5e5; }
@@ -145,7 +147,46 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 }
 .other-message .message-meta{order: 1;}
 .other-message .edited-indicator,.other-message .message-time {text-align: left;}
+#translate-button {
+    background: transparent;
+    border: none;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-color);
+    cursor: pointer;
+    font-size: 18px; /* 아이콘 크기 */
+    transition: color 0.2s ease;
+    flex-shrink: 0; /* 찌그러짐 방지 */
+}
 
+#translate-button:hover {
+    color: var(--main-color);
+}
+#translate-button.active {
+    color: var(--main-color);
+}
+#language-select {
+    opacity: 0;
+    visibility: hidden;
+    width: 0; /* 너비 0으로 축소 */
+    padding: 0;
+    border-width: 0;
+    margin-left: 0;
+    margin-right: 0;
+    transform: scaleX(0); /* 가로로 찌그러지는 애니메이션 */
+    transform-origin: left; /* 왼쪽을 기준으로 찌그러짐 */
+    transition: all 0.2s ease-out;
+}
+#language-select.visible {
+    opacity: 1;
+    visibility: visible;
+    width: 80px;
+    transform: scaleX(1);
+}
 .menu-options-popup {
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%,-50%);
@@ -964,4 +1005,105 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .message-menu-container {
     position: absolute; /* 👈 [추가] 이 코드가 "유령 공간"을 없앱니다. */
     z-index: 10;        /* 👈 (선택 사항) 다른 요소 위에 뜨도록 보장합니다. */
+}
+/* ========================
+   날짜 구분선 스타일
+   ======================== */
+.date-separator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.date-separator span {
+    background-color: #f0f0f0; /* 카톡 스샷과 유사한 배경색 */
+    color: #555; /* 글자색 */
+    font-size: 0.8rem; /* 12px~13px */
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 15px; /* 둥근 모서리 */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+#send-button i {
+    font-family: "Font Awesome 5 Free", "Font Awesome 5 Brands", sans-serif;
+    font-weight: 900; /* Font Awesome 'solid' 아이콘은 900입니다 */
+    font-size: 16px; /* 아이콘 크기 */
+}
+#send-button.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1); /* 원래 크기로 커짐 */
+}
+
+/* 'no-bubble' 래퍼의 패딩/그림자 제거 */
+.bubble-wrapper.no-bubble {
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+/* '.bubble-content'가 아니라 '.message-bubble'의 스타일을'my-message'와 'other-message'에 대해 *매우 구체적으로* 덮어씁니다.*/
+.my-message .bubble-wrapper.no-bubble .message-bubble,
+.other-message .bubble-wrapper.no-bubble .message-bubble {
+    padding: 0 !important;      /* 👈 덮어쓰기 강제 */
+    background: none !important; /* 👈 덮어쓰기 강제 */
+    border-radius: 0;
+    box-shadow: none;
+    border: none;
+}
+
+/* 버블이 사라진 '이미지' 자체에 스타일 적용 (chat-image) */
+.bubble-wrapper.no-bubble .message-bubble .chat-image {
+    max-width: 250px; /* 채팅방 너비에 맞게 조절 */
+    border-radius: 12px; /* 이미지 자체를 둥글게 */
+    cursor: pointer;
+    display: block; /* <img> 태그 아래의 미세한 여백 제거 */
+}
+
+/* 버블이 사라진 '파일 링크' 자체에 스타일 적용 (chat-file-link) */
+.bubble-wrapper.no-bubble .message-bubble .chat-file-link {
+    display: inline-block;
+    padding: 12px 16px;
+    background-color: var(--my-message-color); /* 내 메시지 버블 색상 재활용 */
+    border: 1px solid #e9ecef; /* 옅은 테두리 */
+    border-radius: 12px;
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+}
+
+/* 상대방이 보낸 파일 링크 스타일 */
+.other-message .bubble-wrapper.no-bubble .message-bubble .chat-file-link {
+    background-color: var(--other-message-color); /* 상대방 버블 색상 재활용 */
+}
+
+/* (1) 시간과 제목을 감싸는 Flexbox 컨테이너를 '세로' 방향으로 변경 */
+.fc-daygrid-event .fc-event-main-frame {
+    flex-direction: column; /* 'row' (가로) -> 'column' (세로) */
+    align-items: flex-start;  /* 세로로 쌓을 때 왼쪽 정렬 */
+    padding: 2px 4px;       /* 내부 여백 살짝 추가 (선택 사항) */
+}
+
+/* (2) 이벤트 '제목'이 ...으로 짤리지 않고 자동 줄바꿈(wrap) 되도록 설정 */
+.fc-event-title {
+    white-space: normal !important; /* 'nowrap'을 덮어쓰고 자동 줄바꿈 허용 */
+    word-wrap: break-word;          /* 긴 단어가 있을 경우 강제 줄바꿈 */
+}
+
+/* (3) '시간' (예: 오전 9:00) 스타일 (선택 사항) */
+.fc-event-time {
+    font-weight: 600; /* 시간을 살짝 굵게 */
+    font-size: 0.9em;
+}
+.modal.modal-large {
+    /* * 'width: 90vw;'는 모바일/작은 화면에서 좌우 여백을 주고,
+     * 'max-width: 900px;'는 큰 모니터에서 캘린더가
+     * 너무 넓어지지 않게 적당한 최대 너비를 설정합니다.
+     */
+    width: 35vw;       /* 화면 너비의 35%를 사용 */
+    max-width: 900px;  /* 하지만 최대 900px까지만 커지도록 */
 }
