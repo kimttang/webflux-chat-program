@@ -8,7 +8,7 @@ import reactor.core.publisher.Mono;
 public interface ChatMessageRepository extends ReactiveMongoRepository<ChatMessage, String> {
     Flux<ChatMessage> findByRoomIdOrderByCreatedAtAsc(String roomId);
     Mono<Void> deleteByRoomId(String roomId);
-    @Query("{ 'roomId': ?0, '$text': { '$search': ?1 } }")
+    @Query("{ 'roomId': ?0, 'content': { '$regex': ?1, '$options': 'i' } }")
     Flux<ChatMessage> findByRoomIdAndSearchKeyword(String roomId, String keyword);
     Mono<ChatMessage> findTopByRoomIdOrderByCreatedAtDesc(String roomId);
 

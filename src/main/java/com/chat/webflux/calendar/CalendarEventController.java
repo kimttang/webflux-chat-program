@@ -1,26 +1,18 @@
 package com.chat.webflux.calendar;
 
 import com.chat.webflux.chatroom.ChatRoom;
-import lombok.RequiredArgsConstructor;
 import com.chat.webflux.chatroom.ChatRoomRepository;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-
 import java.time.Instant;
 
+//캘린더 일정(Event)의 CRUD API 요청을 처리하는 컨트롤러
 @RestController
 @RequestMapping("/api/calendar")
 @RequiredArgsConstructor
@@ -29,12 +21,14 @@ public class CalendarEventController {
     private final CalendarEventRepository calendarEventRepository;
     private final ChatRoomRepository chatRoomRepository;
 
+    // FullCalendar 라이브러리가 인식할 수 있는 형식으로 변환하기 위한 DTO
     @lombok.Data
     private static class FullCalendarDto {
         private String id;
         private String title;
         private String start;
 
+        //CalendarEvent 엔티티를 FullCalendarDto로 변환하는 생성자
         public FullCalendarDto(CalendarEvent event) {
             this.id = event.getId();
             this.title = event.getTitle();
@@ -42,28 +36,32 @@ public class CalendarEventController {
         }
     }
 
+    //"개인 일정" 생성 요청 시 프론트엔드가 보낼 JSON 본문을 매핑하기 위한 DTO
     @lombok.Data
     private static class PersonalEventDto {
-        private String title;  // "기획 회의"
-        private String start;  // "2025-10-30T14:00:00Z" (JS가 변환해서 보냄)
+        private String title;
+        private String start;
         private String userId;
     }
+
+    //일정 수정 요청 시 사용할 DTO
     @lombok.Data
     private static class UpdateEventDto {
-        private String title;  // (JS가 보낼) 새 제목
-        private String start;  // (JS가 보낼) 새 시작 시간 (드래그)
+        private String title;
+        private String start;
     }
 
+    //공용 일정 생성 요청 시 프론트엔드가 보낼 JSON 본문을 매핑하기 위한 DTO
     @lombok.Data
     private static class CreateEventDto {
         private String title;
-        private String start; // "2025-10-29T12:00:00Z" (ISO 8601 형식)
+        private String start;
     }
-    // "개인" 캘린더 조회 API
 
+    // "개인" 캘린더 조회 API
     @GetMapping("/personal/{userId}")
     public Flux<FullCalendarDto> getPersonalEvents(@PathVariable String userId) {
-        // DB에서 "개인(PERSONAL)" 범위와 "내 ID(userId)"로 일정을 찾음
+        // DB에서 개인 캘린더 범위와 내 ID로 일정을 찾음
         return calendarEventRepository.findByScopeAndOwnerId("PERSONAL", userId)
                 .map(FullCalendarDto::new); // DTO로 변환
     }
@@ -80,7 +78,7 @@ public class CalendarEventController {
     @PostMapping("/copy-to-personal/{eventId}")
     public Mono<CalendarEvent> copyToPersonalCalendar(
             @PathVariable String eventId,
-            @RequestParam String userId) { // (테스트를 위해 임시로 RequestParam 사용)
+            @RequestParam String userId) {
 
         // 1. 복사할 원본(ROOM) 이벤트를 ID로 찾음
         return calendarEventRepository.findById(eventId)
@@ -99,36 +97,37 @@ public class CalendarEventController {
                 });
     }
 
+    //"개인" 캘린더에 새 일정을 생성
     @PostMapping("/personal")
     public Mono<CalendarEvent> createPersonalEvent(
-            @RequestBody PersonalEventDto dto) { // 1-1에서 만든 DTO로 받음
+            @RequestBody PersonalEventDto dto) {
 
         // 1. 새 개인 일정 객체 생성
         CalendarEvent newEvent = new CalendarEvent();
         newEvent.setTitle(dto.getTitle());
-        newEvent.setStart(Instant.parse(dto.getStart())); // JS가 보낸 ISO 문자열을 Instant로
+        newEvent.setStart(Instant.parse(dto.getStart()));
 
-        // 2. [핵심] 범위를 "개인"으로, 소유자를 DTO의 userId로 설정
+        // 2. 범위를 "개인"으로, 소유자를 DTO의 userId로 설정
         newEvent.setScope("PERSONAL");
         newEvent.setOwnerId(dto.getUserId());
 
-        // 3. DB에 저장 (Create)
+        // 3. DB에 저장
         return calendarEventRepository.save(newEvent);
     }
 
+    //"공용 캘린더"에 새 일정을 생성합니다.
     @PostMapping("/ROOM/{roomId}")
     public Mono<CalendarEvent> createRoomEvent(
             @PathVariable String roomId,
             @RequestParam("userId") String userId,
             @RequestBody CreateEventDto dto) {
 
-        // 1. 권한 확인: 이 유저가 채팅방 멤버가 맞는지?
-        // (ChatRoomRepository는 이미 @RequiredArgsConstructor로 주입되어 있음)
+        // 1. 권한 확인
         Mono<ChatRoom> roomCheck = chatRoomRepository.findById(roomId)
                 .filter(room -> room.getMembers().contains(userId))
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "채팅방 멤버만 일정을 추가할 수 있습니다.")));
 
-        // 2. 권한 확인이 성공하면(.then) 일정 생성 로직 실행
+        // 2. 권한 확인이 성공하면 일정 생성 로직 실행
         return roomCheck.then(Mono.fromCallable(() -> {
                     CalendarEvent newEvent = new CalendarEvent();
                     newEvent.setTitle(dto.getTitle());
@@ -137,12 +136,12 @@ public class CalendarEventController {
                     newEvent.setOwnerId(roomId); // 이 일정의 주인은 "채팅방"
                     return newEvent;
                 }))
-                .flatMap(calendarEventRepository::save); // 3. DB에 저장
+                .flatMap(calendarEventRepository::save); // DB에 저장
     }
 
-    //D (삭제) API
+    //삭제 API
     @DeleteMapping("/{eventId}")
-    public Mono<ResponseEntity<Void>> deleteEvent( // ✨ 1. 반환 타입을 Mono<ResponseEntity<Void>>로 변경
+    public Mono<ResponseEntity<Void>> deleteEvent( // 반환 타입을 Mono<ResponseEntity<Void>>로 변경
                                                    @PathVariable String eventId,
                                                    @RequestParam String userId) {
 
@@ -150,18 +149,53 @@ public class CalendarEventController {
         return calendarEventRepository.findById(eventId)
                 .flatMap(event -> {
                     Mono<Void> permissionCheck = Mono.empty();
-                    // 3. ✨ [로직 수정] 삭제 후, 명시적으로 "200 OK" 응답 반환
+                    // 3. 삭제 후, 명시적으로 "200 OK" 응답 반환
                     return permissionCheck
                             .then(calendarEventRepository.delete(event))
                             // 성공 시: "200 OK" 빈 응답(ResponseEntity)을 반환
                             .then(Mono.just(ResponseEntity.ok().<Void>build()));
                 })
-                // ✨ 4. [로직 수정] ID로 못 찾았을 때만 "404 Not Found" 응답 반환
+                // ID로 못 찾았을 때만 "404 Not Found" 응답 반환
                 .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
     }
 
 
-    //(수정) API
+    //수동 '공용 일정' 생성을 위한 DTO 추가
+    @lombok.Data
+    private static class CreateRoomEventDto {
+        private String title;
+        private String start;
+    }
+
+    // 공용 일정 생성 API 추가
+    @PostMapping("/room/{roomId}")
+    public Mono<CalendarEvent> createRoomEvent(
+            @PathVariable String roomId,
+            @RequestBody CreateRoomEventDto dto) {
+
+        // 1. 새 CalendarEvent 객체 생성
+        CalendarEvent newEvent = new CalendarEvent();
+        newEvent.setTitle(dto.getTitle());
+
+        try {
+            // 2. 프론트엔드에서 받은 UTC ISO 문자열을 Instant로 파싱
+            newEvent.setStart(Instant.parse(dto.getStart()));
+        } catch (Exception e) {
+            // 3. 날짜 형식이 잘못된 경우 400 Bad Request 오류 반환
+            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "잘못된 날짜 형식입니다. UTC (YYYY-MM-DDTHH:mm:ssZ) 형식이 필요합니다.", e));
+        }
+
+        // 4. "공용" 일정 정보 설정
+        newEvent.setScope("ROOM");
+        newEvent.setOwnerId(roomId);
+
+        // 5. DB에 저장 후 반환
+        return calendarEventRepository.save(newEvent);
+    }
+
+
+    //수정 API
     @PutMapping("/{eventId}")
     public Mono<CalendarEvent> updateEvent(
             @PathVariable String eventId,
@@ -171,10 +205,7 @@ public class CalendarEventController {
         // 1. DB에서 수정할 이벤트를 찾음
         return calendarEventRepository.findById(eventId)
                 .flatMap(event -> {
-
-                    // 2. [임시 수정] 권한 확인 로직을 "전부" 주석 처리 (테스트용)
-                    Mono<Void> permissionCheck = Mono.empty(); // (무조건 통과)
-
+                    Mono<Void> permissionCheck = Mono.empty();
                     // 3. 권한 확인이 성공했을 때만(.then) 수정 로직 실행
                     return permissionCheck.then(Mono.fromCallable(() -> {
                                 if (dto.getTitle() != null) {

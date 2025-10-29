@@ -10,12 +10,18 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
+/*
+ MongoDB의 "chatrooms" 컬렉션에 매핑되는 엔티티 클래스
+ 채팅방의 기본 정보(이름, 멤버, 생성일 등)를 저장
+*/
+
 @Getter
 @Setter
 @NoArgsConstructor
 @Document(collection = "chatrooms")
 public class ChatRoom {
 
+    //채팅방의 고유 ID, MongoDB의 기본 키 '_id' 필드에 매핑
     @Id
     private String id;
     private String name;

@@ -94,6 +94,11 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .menu-gear-icon { cursor: pointer; opacity: 0; transition: opacity 0.2s; }
 .chat-message-item:hover .menu-gear-icon { opacity: 0.7; }
 .menu-gear-icon:hover { opacity: 1; }
+.chat-window,
+.sidebar-body {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
 .chat-header {
     display: flex;
     align-items: center;
@@ -480,6 +485,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .search-bar {
     display: flex; /* 내부 요소들을 가로로 정렬합니다. */
     align-items: center; /* 세로 중앙 정렬 */
+    gap: 8px;
     justify-content: space-between; /* 요소들을 양쪽 끝으로 분산 배치합니다. */
     padding: 8px 12px;
     background-color: #f5f5f5;
@@ -503,6 +509,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     padding: 6px 10px;
     font-size: 0.95em;
     margin-right: 15px; /* 오른쪽 버튼들과의 간격 */
+    flex-shrink: 1;
 }
 
 /* 결과 수 + 이동 버튼을 묶는 컨테이너 */
@@ -513,21 +520,33 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 
 /* 결과 수 (예: 1 / 5) */
 #search-count {
+    white-space: nowrap;
     font-size: 0.9em;
     margin-right: 8px;
+    min-width: 40px;
     color: #555;
+    text-align: center;
 }
 
 /* 위/아래 이동 버튼 */
 #search-prev-button,
 #search-next-button {
-    background: none;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    width: 30px;  /* 버튼 크기 */
+    height: 30px; /* 버튼 크기 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-color);
     cursor: pointer;
-    margin: 0 2px;
-    padding: 3px 6px;
-    font-size: 0.8em;
+    border-radius: 50%; /* 원형 버튼 */
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+#search-prev-button i,
+#search-next-button i {
+    font-size: 13px; /* 아이콘 크기 */
 }
 #search-prev-button:hover,
 #search-next-button:hover {
@@ -998,13 +1017,13 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 .bubble-wrapper {
     display: flex;
     align-items: flex-end;
-    position: relative; /* 👈 [추가] */
+    position: relative;
 }
 
 /* 3. "유령 공간"의 원인이었던 메뉴를 position: absolute로 띄웁니다. */
 .message-menu-container {
-    position: absolute; /* 👈 [추가] 이 코드가 "유령 공간"을 없앱니다. */
-    z-index: 10;        /* 👈 (선택 사항) 다른 요소 위에 뜨도록 보장합니다. */
+    position: absolute; /* [추가] 이 코드가 "유령 공간"을 없앱니다. */
+    z-index: 10;        /*  다른 요소 위에 뜨도록 보장합니다. */
 }
 /* ========================
    날짜 구분선 스타일
@@ -1019,7 +1038,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 }
 
 .date-separator span {
-    background-color: #f0f0f0; /* 카톡 스샷과 유사한 배경색 */
+    background-color: #f0f0f0;
     color: #555; /* 글자색 */
     font-size: 0.8rem; /* 12px~13px */
     font-weight: 500;
@@ -1087,17 +1106,25 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     align-items: flex-start;  /* 세로로 쌓을 때 왼쪽 정렬 */
     padding: 2px 4px;       /* 내부 여백 살짝 추가 (선택 사항) */
 }
-
+.fc-event {
+    background-color: var(--main-color) !important; /* 👈 메인 색상으로 배경 변경 */
+    border-color: var(--main-color) !important;     /* 👈 테두리 색상 변경 */
+    color: black!important;                      /* 👈 글자색 흰색으로 */
+}
 /* (2) 이벤트 '제목'이 ...으로 짤리지 않고 자동 줄바꿈(wrap) 되도록 설정 */
 .fc-event-title {
     white-space: normal !important; /* 'nowrap'을 덮어쓰고 자동 줄바꿈 허용 */
     word-wrap: break-word;          /* 긴 단어가 있을 경우 강제 줄바꿈 */
+    font-size: 12px !important;
 }
 
 /* (3) '시간' (예: 오전 9:00) 스타일 (선택 사항) */
 .fc-event-time {
     font-weight: 600; /* 시간을 살짝 굵게 */
     font-size: 0.9em;
+}
+.fc-day-today {
+    background-color: #f7f7be !important;
 }
 .modal.modal-large {
     /* * 'width: 90vw;'는 모바일/작은 화면에서 좌우 여백을 주고,
@@ -1106,4 +1133,219 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
      */
     width: 35vw;       /* 화면 너비의 35%를 사용 */
     max-width: 900px;  /* 하지만 최대 900px까지만 커지도록 */
+}
+#header-menu-btn {
+    background: transparent;
+    border: none;
+    color: var(--gray-color);
+    font-size: 18px;
+    padding: 5px;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+}
+#header-menu-btn:hover {
+    background-color: var(--my-message-color);
+    color: black;
+}
+
+/* 2. 팝업 컨테이너 스타일 */
+.header-popup {
+    position: absolute;
+    top: 50px;           /* 헤더 바로 밑 */
+    right: 10px;         /* 오른쪽 정렬 */
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 100;
+    width: 180px;
+    border: 1px solid #eee;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 3. 팝업 내부의 버튼들 스타일 */
+.header-popup button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 10px;
+    text-align: left;
+    font-size: 15px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+.header-popup button:hover {
+    background-color: var(--my-message-color);
+}
+.header-popup button.text-danger {
+    color: #e63946;
+}
+.header-popup hr.popup-divider {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 5px 0;
+}
+.header-popup button.text-danger {
+    color: #e63946; /* 빨간색 계열 */
+}
+.header-popup button.text-danger:hover {
+    color: white;
+    background-color: #e63946;
+}
+.header #show-announcement-btn,
+.header #search-icon,
+.header #header-menu-btn {
+    /* 1A. [크기] 아이콘 폰트 크기를 키웁니다. */
+    font-size: 20px; /* (기존 18px에서 20px로 키움) */
+
+    /* 1B. [간격] 아이콘 왼쪽에 여백을 줍니다. */
+    margin-left: 8px; /* (값을 조절해 간격을 맞추세요) */
+
+    /* (선택) 버튼의 크기를 일관되게 고정 (정렬을 맞춤) */
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 2. #search-icon은 <span>이므로, 버튼처럼 보이도록 추가 스타일링 */
+.header #search-icon {
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+}
+
+.header #search-icon:hover {
+    background-color: var(--my-message-color);
+    color: black;
+}
+.back-button {
+    /* (기존) 텍스트 스타일이 있다면 덮어씁니다 */
+    font-size: 18px; /* 👈 아이콘 크기 조절 */
+
+    /* (선택) 아이콘을 버튼 중앙에 정렬합니다 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    /* (선택) 버튼 크기 고정 (정렬을 위해) */
+    width: 32px;
+    height: 32px;
+}
+#personal-event-modal .modal-body {
+    padding: 15px 15px; /* 👈 상하 20px, 좌우 25px의 여백 추가 */
+}
+#personal-event-modal .form-group {
+    /* (기존 .form-group 스타일이 flex/column이라면 gap이 좋지만,
+       없을 경우를 대비해 margin-bottom이 가장 안전합니다.)
+    */
+    margin-bottom: 10px; /* 👈 각 폼 그룹 아래에 16px 여백 */
+}
+#personal-event-modal .modal-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 15px 25px;
+    border-top: 1px solid #f0f0f0; /* 구분선 */
+}
+#personal-event-modal .modal-buttons button {
+    width: auto;
+}
+.fc-prev-button .fc-icon,
+.fc-next-button .fc-icon {
+    display: none;
+}
+
+
+.fc-prev-button,
+.fc-next-button {
+    font-size: 0; /* 텍스트 숨기기 */
+    width: 32px;  /* 버튼 크기 고정 */
+    height: 32px; /* 버튼 크기 고정 */
+    padding: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.fc-prev-button::before,
+.fc-next-button::before {
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+
+    /* 3B. 아이콘 크기 */
+    font-size: 14px;
+}
+
+
+.fc-prev-button::before {
+    content: '\f053'; /* (왼쪽 꺾쇠 <) */
+}
+.fc-next-button::before {
+    content: '\f054'; /* (오른쪽 꺾쇠 >) */
+}
+#room-calendar-view .fc-header-toolbar,#calendar-view .fc-header-toolbar {
+    padding-left: 10px;  /* 👈 왼쪽 여백 */
+    padding-right: 10px; /* 👈 오른쪽 여백 */
+    align-items: center;
+}
+.fc-addEventButton-button {
+    font-size: 0; /* 1A. 기존 텍스트 '+' 숨기기 */
+    padding: 0 !important;
+    width: 32px;  /* 1B. 버튼 크기 고정 (화살표와 동일하게) */
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 2. Font Awesome 아이콘을 '::before'로 삽입합니다 */
+.fc-addEventButton-button::before {
+    /* 2A. Font Awesome 글꼴 설정 */
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+
+    /* 2B. 아이콘 크기 */
+    font-size: 16px;
+
+    /* 2C. 아이콘 지정 (fas fa-calendar-plus) */
+    content: '\f271';
+}
+#room-calendar-view .fc-button-group,#calendar-view .fc-button-group {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    /* (버튼 사이의 간격) */
+    gap: 5px;
+}
+
+/* 2. 그룹 내의 개별 버튼들도 배경/테두리 제거 */
+#room-calendar-view .fc-button,#calendar-view .fc-button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+
+    /* 3. 아이콘 색상을 헤더 제목(검은색)과 통일 */
+    color: #333 !important; /* 👈 아이콘 색상을 어둡게 (흰색 -> 검은색) */
+
+    /* (선택) 버튼 모양 및 호버 효과 */
+    border-radius: 5px;
+    transition: background-color 0.2s ease;
+}
+
+/* 4. 마우스를 올리면 짙어지는 효과 */
+#room-calendar-view .fc-button,#calendar-view .fc-button:hover {
+    background-color: rgba(0, 0, 0, 0.1) !important; /* 👈 옅은 회색 배경 */
+}
+#add-personal-event-button {
+    display: none !important;
 }

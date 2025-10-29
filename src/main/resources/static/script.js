@@ -136,10 +136,9 @@ const DOM = {
     profileEditSave: document.getElementById('profile-edit-save'),
     profileEditCancel: document.getElementById('profile-edit-cancel'),
     closeProfileEditModal: document.getElementById('close-profile-edit-modal'),
-     participantsOverlay: document.getElementById('participants-overlay'),
      participantsModal: document.getElementById('participants-modal'),
      closeParticipantsModal: document.getElementById('close-participants-modal'),
-     participantsList: document.getElementById('participants-list'),
+
     replyBar: document.getElementById('reply-bar'),
     replyToUser: document.getElementById('reply-to-user'),
     replyToMessage: document.getElementById('reply-to-message'),
@@ -162,8 +161,6 @@ const DOM = {
     roomEditCancelButton: document.getElementById('room-edit-cancel-button'),
     roomEditSaveButton: document.getElementById('room-edit-save-button'),
     chatRoomProfileHeader: document.getElementById('chat-room-profile-header'),
-    chatHeaderInfo: document.getElementById('chat-header-info'),
-    chatRoomProfileHeader: document.getElementById('chat-room-profile-header'),
     chatRoomNameHeader: document.getElementById('chat-room-name-header'),
     headerIconsRight: document.querySelector('.header-icons-right'),
     defaultHeaderIcons: document.getElementById('default-header-icons'),
@@ -177,7 +174,6 @@ const DOM = {
     roomCalendarOverlay: document.getElementById('room-calendar-overlay'),
     closeRoomCalendarModal: document.getElementById('close-room-calendar-modal'),
     roomCalendarView: document.getElementById('room-calendar-view'),
-    addPersonalEventButton: document.getElementById('add-personal-event-button'),
     personalEventOverlay: document.getElementById('personal-event-overlay'),
     closePersonalEventModal: document.getElementById('close-personal-event-modal'),
     personalEventTitle: document.getElementById('personal-event-title'),
@@ -186,6 +182,15 @@ const DOM = {
     calendarActionArea: document.getElementById('calendar-action-area'),
     cancelPersonalEventButton: document.getElementById('cancel-personal-event-button'),
     savePersonalEventButton: document.getElementById('save-personal-event-button'),
+    headerMenuButton: document.getElementById('header-menu-btn'),
+    headerMenuPopup: document.getElementById('header-menu-popup'),
+    openMembersBtn: document.getElementById('open-members-btn'),
+    openInviteBtn: document.getElementById('open-invite-btn'),
+    leaveRoomBtn: document.getElementById('leave-room-btn'),
+    participantsOverlay: document.getElementById('participants-overlay'),
+    inviteFriendOverlay: document.getElementById('invite-friend-overlay'),
+    participantsList: document.getElementById('participants-list'),
+    inviteFriendList: document.getElementById('invite-friend-list'),
     roomGalleryButton: document.getElementById('room-gallery-button'),
     roomGalleryOverlay: document.getElementById('room-gallery-overlay'),
     closeRoomGalleryModal: document.getElementById('close-room-gallery-modal'),
@@ -218,6 +223,42 @@ const updateSendButtonVisibility = () => {
 if (DOM.messageInput) {
     DOM.messageInput.addEventListener('input', updateSendButtonVisibility);
     updateSendButtonVisibility();
+}
+if (DOM.headerMenuButton) {
+    DOM.headerMenuButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        DOM.headerMenuPopup.classList.toggle('hidden');
+    });
+}
+document.addEventListener('click', (event) => {
+    if (DOM.headerMenuPopup && !DOM.headerMenuPopup.classList.contains('hidden')) {
+        if (!DOM.headerMenuPopup.contains(event.target) && !DOM.headerMenuButton.contains(event.target)) {
+            DOM.headerMenuPopup.classList.add('hidden');
+        }
+    }
+});
+if (DOM.openMembersBtn) {
+    DOM.openMembersBtn.addEventListener('click', () => {
+        DOM.participantsOverlay.classList.remove('hidden');
+        DOM.headerMenuPopup.classList.add('hidden');
+        openParticipantsModal();
+    });
+}
+if (DOM.openInviteBtn) {
+    DOM.openInviteBtn.addEventListener('click', () => {
+        DOM.inviteFriendOverlay.classList.remove('hidden'); // 초대 모달 열기
+        DOM.headerMenuPopup.classList.add('hidden'); // 팝업은 닫음
+        openInviteFriendModal(currentRoomId);
+    });
+}
+if (DOM.leaveRoomBtn) {
+    DOM.leaveRoomBtn.addEventListener('click', () => {
+        // (1) 사용자에게 정말 나갈 것인지 확인
+        if (confirm("정말 이 채팅방을 나가시겠습니까?")) {
+            // (2) '나가기' API 호출
+            leaveCurrentRoom();
+        }
+    });
 }
 DOM.loginButton.addEventListener('click', async () => {
     const username = DOM.loginUsernameInput.value; const password = DOM.loginPasswordInput.value;
@@ -512,9 +553,6 @@ function openPersonalEventModal() {
 function closePersonalEventModal() {
     DOM.personalEventOverlay.classList.add('hidden');
 }
-
-// "새 일정 추가" 버튼 클릭 시 모달 열기
-DOM.addPersonalEventButton.addEventListener('click', openPersonalEventModal);
 
 // 취소/닫기 버튼 클릭 시 모달 닫기
 DOM.cancelPersonalEventButton.addEventListener('click', closePersonalEventModal);
@@ -926,35 +964,6 @@ async function showChatScreen(roomId, roomName, announcement) {
     const existingButtons = header.querySelector('.chat-header-buttons');
     if (existingButtons) { header.removeChild(existingButtons); }
 
-    const buttonContainer = document.createElement('div');
-    buttonContainer.className = 'chat-header-buttons';
-
-    const participantsButton = document.createElement('button');
-    participantsButton.id = 'participants-button';
-    participantsButton.className = 'icon-button';
-    participantsButton.innerHTML = '<i class="fas fa-users"></i>';
-    participantsButton.title = "참가자 보기";
-    buttonContainer.appendChild(participantsButton);
-
-    const inviteButton = document.createElement('button');
-    inviteButton.id = 'invite-user-button';
-    inviteButton.className = 'icon-button';
-    inviteButton.innerHTML = '<i class="fas fa-user-plus"></i>';
-    inviteButton.title = translations.inviteButton[currentLanguage];
-
-    const leaveButton = document.createElement('button');
-    leaveButton.id = 'leave-room-button';
-    leaveButton.className = 'icon-button';
-    leaveButton.innerHTML = '<i class="fas fa-door-open"></i>';
-    leaveButton.title = translations.leaveButton[currentLanguage];
-
-    buttonContainer.appendChild(inviteButton);
-    buttonContainer.appendChild(leaveButton);
-    header.appendChild(buttonContainer);
-
-    participantsButton.addEventListener('click', openParticipantsModal);
-    inviteButton.addEventListener('click', () => openInviteFriendModal(currentRoomId));
-    leaveButton.addEventListener('click', leaveCurrentRoom);
 
     DOM.chatWindow.innerHTML = '';
     resetMessageGrouping(); //  (메시지 연속성 초기화)
@@ -2177,10 +2186,20 @@ function renderCalendar() {
 
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
+        customButtons: {
+            addEventButton: { // (버튼 이름)
+                text: '+', // (아이콘으로 대체될 임시 텍스트)
+                click: function() {
+                    openPersonalEventModal();
+                    document.getElementById('personal-event-overlay').classList.remove('hidden');
+                    document.getElementById('personal-event-date').valueAsDate = new Date(); // (선택) 오늘 날짜 자동 입력
+                }
+            }
+        },
         headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek'
+            left: 'title',
+            center: '',
+            right: 'addEventButton,prev,next'
         },
         height: '100%',
         locale: 'ko',
@@ -2268,12 +2287,24 @@ function renderRoomCalendar(roomId) {
         height: '610px',
         eventDisplay: 'block',
         eventClassNames: 'custom-room-event',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,listWeek'
+        customButtons: {
+            addEventButton: {
+                text: '+', // (CSS로 아이콘을 덮어쓸 예정)
+                click: function() {
+                    // (3-3에서 추가할 함수를 호출)
+                    openRoomEventModal();
+                }
+            }
         },
-        events: '/api/calendar/room/' + roomId, // 공용 일정
+
+        // [✨ 3-2. 헤더 툴바 수정 (right 속성 변경)]
+        headerToolbar: {
+            left: 'title',
+            center: '',
+            // (기존 'prev,next'에 'addEventButton'을 맨 앞에 추가)
+            right: 'addEventButton prev,next'
+        },
+        events: '/api/calendar/room/' + roomId,
 
         // [U] 1. 일정을 마우스로 드래그할 수 있게 허용 (공용)
         editable: true,
@@ -2396,3 +2427,92 @@ function createDateSeparatorElement(isoString) {
     separator.innerHTML = `<span>${formattedDate}</span>`;
     return separator;
 }
+// ===================================================================
+// [✨ 3-3. '공용 일정 추가' 모달 제어 로직 (새로 추가)]
+// ===================================================================
+
+// (2단계에서 만든 HTML의 DOM 요소들을 미리 찾아둡니다)
+const roomEventOverlay = document.getElementById('room-event-overlay');
+const roomEventTitle = document.getElementById('room-event-title');
+const roomEventDate = document.getElementById('room-event-date');
+const roomEventTime = document.getElementById('room-event-time');
+
+/**
+ * '공용 일정 추가' 모달을 엽니다. (캘린더 '+' 버튼 클릭 시 호출됨)
+ */
+function openRoomEventModal() {
+    // 입력 필드 초기화
+    roomEventTitle.value = '';
+
+    // 기본 날짜/시간을 현재로 설정 (편의 기능)
+    const now = new Date();
+    roomEventDate.value = now.toLocaleDateString('sv-SE'); // YYYY-MM-DD (스웨덴 로케일이 이 형식임)
+    roomEventTime.value = now.toTimeString().substring(0, 5); // HH:mm
+
+    roomEventOverlay.classList.remove('hidden');
+}
+
+/**
+ * '공용 일정 추가' 모달을 닫습니다.
+ */
+function closeRoomEventModal() {
+    roomEventOverlay.classList.add('hidden');
+}
+
+// [이벤트 리스너 연결]
+
+// 1. 모달 '취소' 버튼
+document.getElementById('cancel-room-event-button').addEventListener('click', closeRoomEventModal);
+
+// 2. 모달 'X' 닫기 버튼 (index.html에 추가하셨던 버튼)
+document.getElementById('close-room-event-modal').addEventListener('click', closeRoomEventModal);
+
+// 3. 모달 '저장' 버튼 (핵심 로직)
+document.getElementById('save-room-event-button').addEventListener('click', async () => {
+    const title = roomEventTitle.value.trim();
+    const date = roomEventDate.value;
+    const time = roomEventTime.value || '00:00'; // 시간이 비면 자정(00:00)으로
+
+    if (!title || !date) {
+        alert('제목과 날짜를 모두 입력해주세요.');
+        return;
+    }
+
+    if (!currentRoomId) {
+        alert('채팅방이 선택되지 않았습니다. (오류)');
+        return;
+    }
+
+    try {
+        // 1. KST 날짜/시간을 UTC 표준시(ISO 문자열)로 변환
+        // (예: "2025-10-30T15:00:00" (KST) -> "2025-10-30T06:00:00.000Z" (UTC))
+        const localDateTime = new Date(`${date}T${time}:00`);
+        const utcIsoString = localDateTime.toISOString();
+
+        // 2. [1단계]에서 만든 백엔드 API 호출
+        const response = await fetch(`/api/calendar/room/${currentRoomId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: title,
+                start: utcIsoString // UTC 시간으로 전송
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`일정 생성 실패: ${errorText}`);
+        }
+
+        // 3. 성공 시 모달 닫기 및 캘린더 새로고침
+        closeRoomEventModal();
+        if (roomCalendarInstance) {
+            roomCalendarInstance.refetchEvents(); // 캘린더 UI 즉시 갱신
+        }
+        alert('공용 일정이 추가되었습니다.');
+
+    } catch (error) {
+        console.error('공용 일정 저장 실패:', error);
+        alert('오류가 발생했습니다: ' + error.message);
+    }
+});
