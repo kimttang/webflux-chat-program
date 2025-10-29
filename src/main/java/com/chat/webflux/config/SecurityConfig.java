@@ -32,7 +32,9 @@ public class SecurityConfig {
                                 "/",
                                 "/index.html",
                                 "/style.css",
-                                "/script.js"
+                                "/script.js",
+                                "/utils.js",
+                                "/translations.js"
                         ).permitAll()
 
                         // 아이콘/로고 등 리소스 폴더 허용

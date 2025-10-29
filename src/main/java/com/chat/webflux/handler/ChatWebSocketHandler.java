@@ -25,6 +25,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -299,8 +300,6 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         // 1. 봇 이름, API URL, 모델 설정
         final String BOT_USERNAME = "바브봇";
         final int MESSAGE_LIMIT = 50;
-        final String OLLAMA_API_URL = "http://localhost:11434/api/chat";
-        final String OLLAMA_MODEL = "gemma3:4b"; // (기존 translateMessage에서 사용하는 모델)
 
         // 2. 채팅방 정보 및 최근 메시지를 가져옵니다.
         Mono<ChatRoom> roomMono = chatRoomRepository.findById(roomId);
@@ -346,9 +345,10 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                     String prompt = "다음은 채팅 대화 내용입니다. 이 대화의 핵심 내용을 3줄 이내로 간결하게 요약해주세요.\n\n[대화 내용]\n" + conversationContext;
 
                     // 6. Ollama API 호출
-                    OllamaRequest ollamaRequest = new OllamaRequest(OLLAMA_MODEL, List.of(new OllamaMessage("user", prompt)), false);
+                    OllamaRequest ollamaRequest = new OllamaRequest(ollamaModel, List.of(new OllamaMessage("user", prompt)), false);
+                    String finalApiUrl = ollamaBaseUrl.endsWith("/api/chat") ? ollamaBaseUrl : ollamaBaseUrl + "/api/chat";
 
-                    return webClient.post().uri(OLLAMA_API_URL).bodyValue(ollamaRequest)
+                    return webClient.post().uri(finalApiUrl).bodyValue(ollamaRequest)
                             .retrieve()
                             .bodyToMono(OllamaResponse.class)
                             .flatMap(ollamaResponse -> {
@@ -517,11 +517,11 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     }
 
     public void broadcastMessage(String roomId, OutgoingMessage outgoingMessage, WebSocketSession exclude) {
-        Set<WebSocketSession> roomSessions = sessions.get(roomId);
-        if (roomSessions != null) {
+        Map<String, WebSocketSession> sessionsInRoom = roomSessions.get(roomId); // ⬅️ [수정]
+        if (sessionsInRoom != null) {
             try {
                 String messageStr = objectMapper.writeValueAsString(outgoingMessage);
-                roomSessions.stream()
+                sessionsInRoom.values().stream()
                         .filter(s -> s.isOpen() && (exclude == null || !s.getId().equals(exclude.getId())))
                         .forEach(s -> s.send(Mono.just(s.textMessage(messageStr))).subscribe());
             } catch (IOException e) {
@@ -542,13 +542,15 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     }
 
     public boolean isUserPresent(String roomId, String username) {
-        Set<WebSocketSession> roomSessions = sessions.get(roomId);
+        Map<String, WebSocketSession> sessionsInRoom = roomSessions.get(roomId);
         if (roomSessions == null) return false;
-        return roomSessions.stream().anyMatch(s -> username.equals(getUsernameFromUri(s)));
+        return sessionsInRoom.values().stream().anyMatch(s -> username.equals(getUsernameFromUri(s)));
     }
 
     private boolean isUserPresentInAnyRoom(String username) {
-        return sessions.values().stream().flatMap(Set::stream).anyMatch(s -> username.equals(getUsernameFromUri(s)));
+        return roomSessions.values().stream() // Map<String, WebSocketSession>
+                .flatMap(sessionsInRoom -> sessionsInRoom.values().stream()) // WebSocketSession
+                .anyMatch(s -> username.equals(getUsernameFromUri(s)));
     }
 
     private String getRoomId(WebSocketSession session) {
@@ -585,9 +587,6 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     // !일정 명령어를 처리하는 함수 (AI 연동)
     private Mono<Void> processScheduleCommand(String commandText, String roomId) {
 
-        final String OLLAMA_API_URL = "http://localhost:11434/api/chat";
-        final String OLLAMA_MODEL = "gemma3:4b";
-
         // ollama가 제목에 날짜를 빼도록 프롬프트 수정
         String prompt = String.format(
                 "Today's date is %s. The user's timezone is KST (UTC+9). " +
@@ -602,9 +601,10 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 commandText
         );
 
-        OllamaRequest ollamaRequest = new OllamaRequest(OLLAMA_MODEL, List.of(new OllamaMessage("user", prompt)), false);
+        OllamaRequest ollamaRequest = new OllamaRequest(ollamaModel, List.of(new OllamaMessage("user", prompt)), false);
+        String finalApiUrl = ollamaBaseUrl.endsWith("/api/chat") ? ollamaBaseUrl : ollamaBaseUrl + "/api/chat";
 
-        return webClient.post().uri(OLLAMA_API_URL)
+        return webClient.post().uri(finalApiUrl)
                 .bodyValue(ollamaRequest)
                 .retrieve()
                 .bodyToMono(OllamaResponse.class)
