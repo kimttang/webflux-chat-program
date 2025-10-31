@@ -8,7 +8,6 @@ import com.chat.webflux.user.UserRepository;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import org.springframework.dao.DuplicateKeyException;
 
 
 // 1:1 다이렉트 메시지(DM) 관련 API 요청을 처리하는 컨트롤러
@@ -74,6 +74,6 @@ public class DirectMessageController {
                             }));
                 })
                 // 6. Mono.zip 단계에서 사용자 정보를 찾지 못한 경우
-                .switchIfEmpty(Mono.error(new RuntimeException("DM_CREATE_USER_NOT_FOUND_ERROR")));
+                .switchIfEmpty(Mono.error(new RuntimeException("1:1 채팅 생성 실패: 사용자 정보를 찾을 수 없습니다.")));
     }
 }

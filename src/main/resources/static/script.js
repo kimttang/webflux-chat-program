@@ -224,15 +224,10 @@ if (DOM.openInviteBtn) {
     });
 }
 if (DOM.leaveRoomBtn) {
-    DOM.leaveRoomBtn.addEventListener('click', async () => {
-        const action = await showChoiceModal(
-            translations['modalLeaveRoomTitle'][currentLanguage],
-            translations['modalLeaveRoomDesc'][currentLanguage],
-            translations['btnCancel'][currentLanguage],
-            translations['leaveButton'][currentLanguage]
-        );
-        if (action === '2') {
-            //  '나가기' API 호출
+    DOM.leaveRoomBtn.addEventListener('click', () => {
+        // (1) 사용자에게 정말 나갈 것인지 확인
+        if (confirm("정말 이 채팅방을 나가시겠습니까?")) {
+            // (2) '나가기' API 호출
             leaveCurrentRoom();
         }
     });
@@ -241,39 +236,16 @@ DOM.loginButton.addEventListener('click', async () => {
     const username = DOM.loginUsernameInput.value; const password = DOM.loginPasswordInput.value;
     try {
         const response = await fetch('/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), });
-        if (response.ok) { const user = await response.json(); currentUser = user.username; currentUserObject = user; showMainScreen();switchTab('friends'); }
-        else {
-            const errorKey = await response.text(); // (Java가 "LOGIN_INVALID_CREDENTIALS" 등을 보냄)
-
-            if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                DOM.loginError.textContent = translations[errorKey][currentLanguage];
-            } else {
-                DOM.loginError.textContent = errorKey;
-            }
-            DOM.loginError.classList.remove('hidden');
-        }
-    } catch (error) { DOM.loginError.textContent = translations['errorLoginFallback'][currentLanguage]; DOM.loginError.classList.remove('hidden'); }
+        if (response.ok) { const user = await response.json(); currentUser = user.username; currentUserObject = user; showMainScreen();switchTab('friends'); } else { const error = await response.text(); DOM.loginError.textContent = error; DOM.loginError.classList.remove('hidden'); }
+    } catch (error) { DOM.loginError.textContent = '로그인 중 오류 발생'; DOM.loginError.classList.remove('hidden'); }
 });
 
 DOM.signupButton.addEventListener('click', async () => {
     const nickname = DOM.signupNicknameInput.value; const username = DOM.signupUsernameInput.value; const password = DOM.signupPasswordInput.value;
     try {
         const response = await fetch('/api/users/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, nickname }), });
-        if (response.ok) { showAlert('alertSignupSuccess'); DOM.signupForm.classList.add('hidden'); DOM.loginForm.classList.remove('hidden'); DOM.loginUsernameInput.value = username; DOM.loginPasswordInput.value = ''; }
-        else {
-            const errorKey = await response.text(); // (Java가 "SIGNUP_USERNAME_EXISTS"를 보냄)
-
-            // translations.js에 이 키가 있는지, 그리고 현재 언어 번역이 있는지 확인
-            if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                // 번역된 메시지를 보여줌
-                DOM.signupError.textContent = translations[errorKey][currentLanguage];
-            } else {
-                // (만약의 경우) 번역 키가 없으면 그냥 서버가 준 키(코드)를 보여줌
-                DOM.signupError.textContent = errorKey;
-            }
-            DOM.signupError.classList.remove('hidden');
-        }
-    } catch (error) { DOM.signupError.textContent = translations['errorSignupFallback'][currentLanguage]; DOM.signupError.classList.remove('hidden'); }
+        if (response.ok) { showAlert('alertSignupSuccess'); DOM.signupForm.classList.add('hidden'); DOM.loginForm.classList.remove('hidden'); DOM.loginUsernameInput.value = username; DOM.loginPasswordInput.value = ''; } else { const error = await response.text(); DOM.signupError.textContent = error; DOM.signupError.classList.remove('hidden'); }
+    } catch (error) { DOM.signupError.textContent = '회원가입 중 오류 발생'; DOM.signupError.classList.remove('hidden'); }
 });
 if (DOM.translateButton) {
     DOM.translateButton.addEventListener('click', () => {
@@ -359,10 +331,7 @@ DOM.addFriendButton.addEventListener('click', async () => {
     const friendUsername = DOM.friendNameInput.value; if (!friendUsername) return;
     try {
         const response = await fetch('/api/friends/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentUsername: currentUser, friendUsername }), });
-        if (response.ok) { showAlert('alertAddFriendSuccess'); DOM.friendNameInput.value = ''; loadFriends(); } else {
-            const errorKey = await response.text();
-            showAlert(errorKey);
-        }
+        if (response.ok) { showAlert('alertAddFriendSuccess'); DOM.friendNameInput.value = ''; loadFriends(); } else { const error = await response.text(); showAlert('alertAddFriendFail', { error: error }); }
     } catch (error) { showAlert('alertAddFriendFail', { error: 'Network error' }); }
 });
 
@@ -408,36 +377,14 @@ DOM.profileEditSave.addEventListener('click', async () => {
     const formData = new FormData(); formData.append('newNickname', newNickname); if (profileImageFile) { formData.append('profileImage', profileImageFile); }
     try {
         const response = await fetch(`/api/users/${currentUser}/profile`, { method: 'POST', body: formData });
-
         if (response.ok) {
-            // [성공]
             const updatedUser = await response.json();
             currentUser = updatedUser.username; currentUserNickname = updatedUser.nickname;
             DOM.usernameDisplay.textContent = updatedUser.nickname; DOM.profilePicture.src = updatedUser.profilePictureUrl || DEFAULT_PROFILE_PICTURE;
             DOM.profileEditOverlay.classList.add('hidden');
-
-            // (성공 알림 추가)
-            showToast(translations['toastProfileUpdateSuccess'][currentLanguage], 'success');
-
             await loadFriends();
-        } else {
-            // [실패] (로그인/친구추가와 동일한 로직)
-            const errorKey = await response.text(); // Java가 "LOGIN_USER_NOT_FOUND" 등을 보냄
-
-            if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                // (Case 1) 번역 키가 있으면 (예: "프로필 업로드 폴더...")
-                showToast(translations[errorKey][currentLanguage], 'error');
-            } else {
-                // (Case 2) 번역 키가 없으면
-                const errorTemplate = translations['toastProfileUpdateFail'][currentLanguage]; // '프로필 업데이트 실패'
-                showToast(`${errorTemplate}: ${errorKey}`, 'error');
-            }
-        }
-    } catch (error) {
-        // [네트워크 오류]
-        console.error('Profile update error:', error);
-        showToast(translations['toastProfileUpdateError'][currentLanguage], 'error');
-    }
+        } else { alert('프로필 업데이트 실패: 오류가 발생했습니다.'); }
+    } catch (error) { console.error('Profile update error:', error); alert('프로필 업데이트 중 오류가 발생했습니다.'); }
 });
 
 // 참가자 목록 모달 닫기 이벤트 리스너
@@ -456,11 +403,6 @@ const inviteFriendList = document.getElementById('invite-friend-list');
 const closeInviteModalButton = document.getElementById('close-invite-modal-button');
 const inviteFriendTitle = document.getElementById('invite-friend-title');
 
-if (closeInviteModalButton && inviteFriendOverlay) {
-    closeInviteModalButton.addEventListener('click', () => {
-        inviteFriendOverlay.classList.add('hidden');
-    });
-}
 //모달 안에서 '초대' 버튼을 클릭했을 때의 동작을 처리
 inviteFriendList.addEventListener('click', async (e) => {
     if (e.target.classList.contains('invite-action-button')) {
@@ -468,7 +410,7 @@ inviteFriendList.addEventListener('click', async (e) => {
         const usernameToInvite = button.dataset.username;
 
         button.disabled = true;
-        button.textContent = translations['inviting'][currentLanguage];
+        button.textContent = '초대 중...';
 
         try {
             const response = await fetch(`/api/chatrooms/${currentRoomId}/invite`, {
@@ -480,38 +422,26 @@ inviteFriendList.addEventListener('click', async (e) => {
                 })
             });
 
-            // [변경] (로그인/프로필수정과 동일한 로직)
-            if (response.ok) {
-                // [성공]
-                button.textContent = translations['invited'][currentLanguage];
-            } else {
-                // [실패]
-                const errorKey = await response.text(); // Java가 "INVITE_PERMISSION_DENIED_ERROR" 등을 보냄
-
-                if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                    // (Case 1) 번역 키가 있으면 (예: "초대 권한이 없습니다.")
-                    showToast(translations[errorKey][currentLanguage], 'error');
-                } else {
-                    // (Case 2) 번역 키가 없으면
-                    showToast(errorKey, 'error'); // 그냥 서버가 준 코드를 보여줌
-                }
-
-                // 실패 시 버튼 원상 복구
-                button.textContent = translations['inviteButton'][currentLanguage];
-                button.disabled = false;
+            if (!response.ok) {
+                throw new Error(await response.text());
             }
 
-        } catch (error) {
-            // [네트워크 오류]
-            console.error('친구 초대에 실패했습니다:', error);
-            // [변경] 번역 키 사용
-            const errorTemplate = translations['toastInviteError'][currentLanguage];
-            showToast(`${errorTemplate}: ${error.message}`, 'error');
+            button.textContent = '초대됨';
 
-            // 오류 시 버튼 원상 복구
-            button.textContent = translations['inviteButton'][currentLanguage];
+        } catch (error) {
+            console.error('친구 초대에 실패했습니다:', error);
+            alert(`초대 중 오류가 발생했습니다: ${error.message}`);
+            button.textContent = '초대';
             button.disabled = false;
         }
+    }
+});
+
+//모달의 닫기 버튼과 바깥 영역 클릭 이벤트를 처리
+closeInviteModalButton.addEventListener('click', () => inviteFriendOverlay.classList.add('hidden'));
+inviteFriendOverlay.addEventListener('click', (e) => {
+    if (e.target === inviteFriendOverlay) {
+        inviteFriendOverlay.classList.add('hidden');
     }
 });
 
@@ -584,15 +514,10 @@ DOM.roomCalendarOverlay.addEventListener('click', (e) => {
     }
 });
 function openPersonalEventModal() {
-    // 1. 폼 초기화
+    // 폼 초기화
     DOM.personalEventTitle.value = '';
-
-    // 2. 기본 날짜/시간을 '현재'로 설정 (공용 캘린더와 동일한 로직)
-    const now = new Date();
-    DOM.personalEventDate.value = now.toLocaleDateString('sv-SE'); // YYYY-MM-DD 형식
-    DOM.personalEventTime.value = now.toTimeString().substring(0, 5); // HH:mm 형식
-
-    // 3. 모달 열기
+    DOM.personalEventDate.valueAsDate = new Date(); // 오늘 날짜로 기본값
+    DOM.personalEventTime.value = '09:00'; // 오전 9시로 기본값
     DOM.personalEventOverlay.classList.remove('hidden');
 }
 
@@ -616,7 +541,7 @@ DOM.savePersonalEventButton.addEventListener('click', async () => {
 
     // 1. (방어 코드)
     if (!title || !date || !time || !currentUser) {
-        showToast(translations['toastNeedTitleDate'][currentLanguage], 'error');
+        alert('모든 항목을 입력해야 합니다.');
         return;
     }
 
@@ -641,7 +566,7 @@ DOM.savePersonalEventButton.addEventListener('click', async () => {
         });
 
         if (response.ok) {
-            showToast('개인 일정이 저장되었습니다.', 'success');
+            alert('개인 일정이 저장되었습니다.');
             closePersonalEventModal(); // 모달 닫기
 
             // [중요] 메인 캘린더(개인용)를 새로고침하여 방금 추가한 일정을 표시
@@ -649,11 +574,11 @@ DOM.savePersonalEventButton.addEventListener('click', async () => {
                 calendarInstance.refetchEvents();
             }
         } else {
-            showToast('저장에 실패했습니다.', 'error');
+            alert('저장에 실패했습니다.');
         }
     } catch (error) {
         console.error('Error saving personal event:', error);
-        showToast('저장 중 오류가 발생했습니다.', 'error');
+        alert('저장 중 오류가 발생했습니다.');
     }
 });
 
@@ -710,7 +635,7 @@ async function openGalleryModal(roomId) {
         let fileCount = 0;
 
         if (messages.length === 0) {
-            DOM.galleryImagesContent.innerHTML = `<p>${translations['galleryNoFilesFound'][currentLanguage]}</p>`;
+            DOM.galleryImagesContent.innerHTML = '<p>업로드된 파일이 없습니다.</p>';
             DOM.roomGalleryOverlay.classList.remove('hidden');
             return;
         }
@@ -724,7 +649,7 @@ async function openGalleryModal(roomId) {
                 const imgLink = document.createElement('a');
                 imgLink.href = msg.fileUrl;
                 imgLink.target = '_blank';
-                imgLink.title = msg.content || translations['galleryImageFallbackTitle'][currentLanguage];
+                imgLink.title = msg.content || `이미지`;
 
                 const img = document.createElement('img');
                 img.src = msg.fileUrl; // (썸네일이 필요하면 썸네일 URL 사용)
@@ -741,7 +666,7 @@ async function openGalleryModal(roomId) {
                 const link = document.createElement('a');
                 link.href = msg.fileUrl;
                 // ChatMessage.java의 content (파일 업로드 시 원본 파일명 저장)
-                link.textContent = msg.content || translations['galleryDownloadFallbackText'][currentLanguage];
+                link.textContent = msg.content || '다운로드';
                 link.target = '_blank';
                 link.download = msg.content || ''; // 원본 파일명으로 다운로드
 
@@ -762,19 +687,19 @@ async function openGalleryModal(roomId) {
         });
 
         // 탭에 카운트 표시 (선택 사항)
-        DOM.galleryTabImages.textContent = `${translations['galleryTabImages'][currentLanguage]} (${imageCount})`;
-        DOM.galleryTabFiles.textContent = `${translations['galleryTabFiles'][currentLanguage]} (${fileCount})`;
+        DOM.galleryTabImages.textContent = `이미지 (${imageCount})`;
+        DOM.galleryTabFiles.textContent = `파일 (${fileCount})`;
 
         // (방어 코드) 만약 이미지/파일이 하나도 없으면 메시지 표시
-        if (imageCount === 0) DOM.galleryImagesContent.innerHTML = `<p>${translations['galleryNoImagesFound'][currentLanguage]}</p>`;
-        if (fileCount === 0) DOM.galleryFilesContent.innerHTML = `<p>${translations['galleryNoFilesFound'][currentLanguage]}</p>`;
+        if (imageCount === 0) DOM.galleryImagesContent.innerHTML = '<p>업로드된 이미지가 없습니다.</p>';
+        if (fileCount === 0) DOM.galleryFilesContent.innerHTML = '<p>업로드된 파일이 없습니다.</p>';
 
         // 분류가 끝나면 모달 표시
         DOM.roomGalleryOverlay.classList.remove('hidden');
 
     } catch (error) {
         console.error('갤러리 로딩 실패:', error);
-        showToast(translations['toastGalleryLoadFailed'][currentLanguage], 'error');
+        alert('파일 보관함을 불러오는 데 실패했습니다.');
     }
 }
 
@@ -835,44 +760,6 @@ function switchTab(tabName) {
             renderCalendar();
         }
     }
-}
-
-function showChoiceModal(title, description, btn1Text, btn2Text) {
-    // 1. DOM 요소 가져오기
-    const overlay = document.getElementById('choice-overlay');
-    const titleEl = document.getElementById('choice-title');
-    const descEl = document.getElementById('choice-description');
-    const btn1 = document.getElementById('choice-btn-1');
-    const btn2 = document.getElementById('choice-btn-2');
-    const cancelBtn = document.getElementById('choice-cancel-btn');
-
-    // 2. Promise 생성
-    return new Promise((resolve) => {
-        // 3. 모달 내용 채우기
-        titleEl.textContent = title;
-        descEl.textContent = description;
-        btn1.textContent = btn1Text;
-        btn2.textContent = btn2Text;
-        overlay.classList.remove('hidden');
-
-        // 4. 리스너 함수 (한 번만 실행되도록)
-        const handleBtn1 = () => { cleanup(); resolve('1'); };
-        const handleBtn2 = () => { cleanup(); resolve('2'); };
-        const handleCancel = () => { cleanup(); resolve(null); };
-
-        // 5. 리스너 연결
-        btn1.onclick = handleBtn1;
-        btn2.onclick = handleBtn2;
-        cancelBtn.onclick = handleCancel;
-
-        // 6. 모달 닫고 리스너 제거하는 정리 함수
-        const cleanup = () => {
-            overlay.classList.add('hidden');
-            btn1.onclick = null;
-            btn2.onclick = null;
-            cancelBtn.onclick = null;
-        };
-    });
 }
 
 async function getUserDetails(username) {
@@ -945,7 +832,7 @@ function changeLanguage(lang) {
     }
 }
 
-    function showAlert(key, replacements = {}) { let message = translations[key][currentLanguage]; for (const placeholder in replacements) { message = message.replace(`{${placeholder}}`, replacements[placeholder]); } showToast(message, 'success'); }
+    function showAlert(key, replacements = {}) { let message = translations[key][currentLanguage]; for (const placeholder in replacements) { message = message.replace(`{${placeholder}}`, replacements[placeholder]); } alert(message); }
     function showAuthScreen() { DOM.authScreen.classList.remove('hidden'); DOM.mainScreen.classList.add('hidden'); DOM.chatScreen.classList.add('hidden'); currentUser = null; currentUserNickname = null; if (websocket) websocket.close(); if (roomEventSource) roomEventSource.close(); if (presenceEventSource) presenceEventSource.close(); }
     function showMainScreen() {
     DOM.authScreen.classList.add('hidden');
@@ -1050,16 +937,11 @@ async function loadFriends() {
 }
 function renderFriendList(friendsToRender) {
     DOM.friendList.innerHTML = ''; // 목록 비우기
-    // [수정] 'ko' 대신, 넘겨받은 lang을 사용
-    friendsToRender.sort((a, b) => sortFriends(a, b, currentLanguage));
+    friendsToRender.sort(sortFriends);
     // 목록 생성
     friendsToRender.forEach(friend => {
-        const isOnline = onlineFriendsCache.has(friend.username);
+        const isOnline = onlineFriendsCache.has(friend.username); // 캐시에서 온라인 상태 확인
         const li = document.createElement('li');
-
-        //  li에 data-friend와 class 추가
-        li.setAttribute('data-friend', JSON.stringify(friend));
-        li.classList.add('friend-list-item'); // 👈 모달 열기용 식별자
         li.innerHTML = `
             <div class="friend-info">
                 <div class="friend-avatar-container">
@@ -1068,150 +950,19 @@ function renderFriendList(friendsToRender) {
                 </div>
                 <span>${friend.nickname}</span>
             </div>
-            
-            <button class="button friend-list-dm-btn" data-username="${friend.username}">
-                ${translations.dmButton[currentLanguage]}
-            </button>
+            <button class="button">${translations.dmButton[currentLanguage]}</button>
         `;
+        li.querySelector('button').addEventListener('click', () => startDM(friend.username));
         DOM.friendList.appendChild(li);
     });
 }
-
-DOM.friendList.addEventListener('click', (e) => {
-
-    // [1] 'DM 버튼'을 눌렀는지 먼저 확인
-    const dmButton = e.target.closest('.friend-list-dm-btn');
-    if (dmButton) {
-        // DM 버튼 클릭 -> DM 시작
-        const username = dmButton.dataset.username;
-        startDM(username);
-        return; // 👈 모달이 열리지 않도록 여기서 종료
-    }
-
-    // [2] '친구 항목(li)'의 나머지 부분을 눌렀는지 확인
-    const friendItem = e.target.closest('.friend-list-item');
-    if (friendItem) {
-        // 친구 항목 클릭 -> 프로필 모달 열기
-        const friend = JSON.parse(friendItem.dataset.friend);
-        openFriendProfileModal(friend);
-    }
-});
-function openFriendProfileModal(friend) {
-    // 1. DOM 요소 가져오기
-    const overlay = document.getElementById('friend-profile-overlay');
-    const nameEl = document.getElementById('friend-profile-name');
-    const picEl = document.getElementById('friend-profile-pic');
-    const dmBtn = document.getElementById('friend-profile-dm-btn');
-    const deleteBtn = document.getElementById('friend-profile-delete-btn');
-    const closeBtn = document.getElementById('friend-profile-close-btn');
-
-    // 2. 모달에 친구 정보 채우기
-    nameEl.textContent = friend.nickname;
-    picEl.src = friend.profilePictureUrl || DEFAULT_PROFILE_PICTURE;
-
-    // 3. (중요) 리스너 중복 방지를 위해 버튼을 복제해서 교체
-    const newDmBtn = dmBtn.cloneNode(true);
-    dmBtn.parentNode.replaceChild(newDmBtn, dmBtn);
-    const newDeleteBtn = deleteBtn.cloneNode(true);
-    deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
-
-    // 4. [DM 버튼] 클릭 리스너 설정 (모달 안의 버튼)
-    newDmBtn.addEventListener('click', () => {
-        startDM(friend.username);
-        overlay.classList.add('hidden'); // 모달 닫기
-    });
-
-    // 5. [친구 삭제 버튼] 클릭 리스너 설정
-    newDeleteBtn.addEventListener('click', async () => {
-        // (1) 재확인 (번역 키 적용)
-        const desc = translations['modalDeleteFriendDesc'][currentLanguage].replace('{nickname}', friend.nickname);
-        const action = await showChoiceModal(
-            translations['modalDeleteFriendTitle'][currentLanguage], // '친구 삭제'
-            desc,                                                   // '정말로... 삭제하시겠습니까?'
-            translations['btnCancel'][currentLanguage],             // '취소' (재사용)
-            translations['btnDelete'][currentLanguage]              // '삭제'
-        );
-
-        // (2) '삭제'를 선택(action === '2')했을 때만 API 호출
-        if (action === '2') {
-            try {
-                // (3) 백엔드 API 호출
-                const response = await fetch(`/api/users/${currentUser}/friends/${friend.username}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    // [성공] 번역 키 사용
-                    showToast(translations['toastDeleteFriendSuccess'][currentLanguage], 'success');
-                    overlay.classList.add('hidden'); // 모달 닫기
-                    loadFriends(); // [중요] 친구 목록 새로고침
-                } else {
-                    // [실패] (로그인/친구추가와 동일한 로직)
-                    const errorKey = await response.text(); // Java가 "LOGIN_USER_NOT_FOUND" 등을 보냄
-
-                    if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                        // (Case 1) 번역 키가 있으면 (예: "삭제할 친구를 찾을 수 없습니다.")
-                        showToast(translations[errorKey][currentLanguage], 'error');
-                    } else {
-                        // (Case 2) 번역 키가 없으면 (예: "UNKNOWN_ERROR")
-                        const errorTemplate = translations['toastDeleteFriendFail'][currentLanguage]; // '삭제 실패'
-                        showToast(`${errorTemplate}: ${errorKey}`, 'error'); // "삭제 실패: UNKNOWN_ERROR"
-                    }
-                }
-            } catch (error) {
-                console.error('친구 삭제 중 오류:', error);
-                // [네트워크 오류] 번역 키 사용
-                showToast(translations['toastDeleteFriendError'][currentLanguage], 'error');
-            }
-        }
-    });
-
-    // 6. [닫기 버튼]
-    closeBtn.onclick = () => {
-        overlay.classList.add('hidden');
-    };
-
-    // 7. 모달 열기
-    overlay.classList.remove('hidden');
-}
-
-async function startDM(friendUsername) {
+    async function startDM(friendUsername) {
     try {
-        const response = await fetch('/api/dm/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fromUser: currentUser, toUser: friendUsername }),
-        });
-
-        // [추가] response.ok 체크
-        if (response.ok) {
-            // [성공]
-            const room = await response.json();
-            const friendResponse = await fetch(`/api/users/${friendUsername}/details`);
-            const friend = await friendResponse.json();
-
-            // (친구 프로필 모달 닫기 - 만약 열려있다면)
-            closeModal(DOM.friendProfileOverlay);
-
-            showChatScreen(room.id, friend.nickname);
-        } else {
-            // [실패] (로그인/프로필수정과 동일한 로직)
-            const errorKey = await response.text(); // Java가 "DM_CREATE_USER_NOT_FOUND_ERROR" 등을 보냄
-
-            if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                // (Case 1) 번역 키가 있으면 (예: "1:1 채팅 생성 실패...")
-                showToast(translations[errorKey][currentLanguage], 'error');
-            } else {
-                // (Case 2) 번역 키가 없으면
-                const errorTemplate = translations['toastDMStartFail'][currentLanguage]; // 'DM 생성 실패'
-                showToast(`${errorTemplate}: ${errorKey}`, 'error');
-            }
-        }
-    } catch (error) {
-        // [네트워크 오류]
-        console.error('DM 시작 실패:', error);
-        showToast(translations['toastDMStartError'][currentLanguage], 'error');
-    }
+    const response = await fetch('/api/dm/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromUser: currentUser, toUser: friendUsername }), });
+    const room = await response.json();
+    const friendResponse = await fetch(`/api/users/${friendUsername}/details`); const friend = await friendResponse.json();
+    showChatScreen(room.id, friend.nickname);
+} catch (error) { console.error('DM 시작 실패:', error); }
 }
 
 
@@ -1236,7 +987,7 @@ function listenToRoomUpdates() {
                     const unreadBadge = room.unreadCount > 0 ? `<span class="unread-badge">${room.unreadCount}</span>` : '';
 
                     let roomDisplayName = room.name;
-                    let lastMessageHtml = `<p class="last-message">${translations['roomListNoMessage'][currentLanguage]}</p>`;
+                    let lastMessageHtml = '<p class="last-message">대화 내용이 없습니다.</p>';
                     let formattedTime = '';
                     let profilePicSrc = room.profilePictureUrl || DEFAULT_PROFILE_PICTURE;
 
@@ -1263,8 +1014,8 @@ function listenToRoomUpdates() {
                     if (room.lastMessage) {
                         let content = '';
                         switch (room.lastMessage.messageType) {
-                            case 'IMAGE': content = translations['roomListImageSent'][currentLanguage]; break;
-                            case 'FILE': content = translations['roomListFileSent'][currentLanguage]; break;
+                            case 'IMAGE': content = '사진을 보냈습니다.'; break;
+                            case 'FILE': content = '파일을 보냈습니다.'; break;
                             default:
                                 const tempDiv = document.createElement('div');
                                 tempDiv.textContent = room.lastMessage.content;
@@ -1272,7 +1023,7 @@ function listenToRoomUpdates() {
                                 break;
                         }
                         lastMessageHtml = `<p class="last-message">${content}</p>`;
-                        formattedTime = formatMessageTime(room.lastMessage.createdAt, currentLanguage);
+                        formattedTime = formatMessageTime(room.lastMessage.createdAt);
                     }
 
                     li.innerHTML = `
@@ -1375,7 +1126,7 @@ function listenToPresenceUpdates() {
                     // 2. 마지막으로 표시된 KST 날짜와 비교합니다.
                     if (currentMessageKSTDate !== currentLastDisplayedDate) {
                         // 3. 날짜가 다르면, 날짜 구분선을 먼저 추가합니다.
-                        DOM.chatWindow.appendChild(createDateSeparatorElement(msg.createdAt, currentLanguage));
+                        DOM.chatWindow.appendChild(createDateSeparatorElement(msg.createdAt));
                         // 4. 마지막 표시 날짜를 지금 날짜로 업데이트합니다.
                         currentLastDisplayedDate = currentMessageKSTDate;
                     }
@@ -1470,8 +1221,7 @@ async function loadPreviousMessages() {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Failed to load messages:', errorText);
-            const errorTemplate = translations['toastLoadMessagesFail'][currentLanguage];
-            showToast(`${errorTemplate}: ${errorText}`, 'error');
+            alert(`메시지를 불러오는 데 실패했습니다: ${errorText}`);
             showMainScreen();
             return;
         }
@@ -1484,7 +1234,7 @@ async function loadPreviousMessages() {
             // 2. 마지막으로 표시된 KST 날짜와 비교합니다.
             if (currentMessageKSTDate !== currentLastDisplayedDate) {
                 // 3. 날짜가 다르면, 날짜 구분선을 먼저 추가합니다.
-                DOM.chatWindow.appendChild(createDateSeparatorElement(msgDto.createdAt, currentLanguage));
+                DOM.chatWindow.appendChild(createDateSeparatorElement(msgDto.createdAt));
                 // 4. 마지막 표시 날짜를 지금 날짜로 업데이트합니다.
                 currentLastDisplayedDate = currentMessageKSTDate;
             }
@@ -1498,7 +1248,6 @@ async function loadPreviousMessages() {
         }, 0);
     } catch (error) {
         console.error('Error in loadPreviousMessages:', error);
-        showToast(translations['toastLoadMessagesFail'][currentLanguage], 'error');
     }
 }
 
@@ -1579,7 +1328,7 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
 
     if (deleted) {
         messageBubble.classList.add('deleted-message');
-        messageBubble.textContent = translations['deletedMessage'][currentLanguage];
+        messageBubble.textContent = "삭제된 메시지입니다.";
     } else {
         // 2. ✨ [추가] 답장 UI를 렌더링하는 코드 블록
         if (repliedMessageInfo) {
@@ -1588,8 +1337,8 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
             replyContainer.className = 'message-reply-container';
 
             let replyContent = reply.content;
-            if (reply.messageType === 'IMAGE') replyContent = translations['replyTypePhoto'][currentLanguage];
-            else if (reply.messageType === 'FILE') replyContent = translations['replyTypeFile'][currentLanguage];
+            if (reply.messageType === 'IMAGE') replyContent = '사진';
+            else if (reply.messageType === 'FILE') replyContent = '파일';
 
             replyContainer.innerHTML = `
                 <strong>${reply.senderNickname}</strong>
@@ -1625,24 +1374,13 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
     if (edited && !deleted) {
         const editedIndicator = document.createElement('span');
         editedIndicator.className = 'edited-indicator';
-        editedIndicator.textContent = translations['editedIndicator'][currentLanguage];
+        editedIndicator.textContent = '(수정됨)';
         metaContainer.appendChild(editedIndicator);
     }
 
     const timeSpan = document.createElement('span');
     timeSpan.className = 'message-time';
-    // [수정] 'ko-KR', 'en-US' 등을 동적으로 설정
-    let locale;
-    switch (currentLanguage) {
-        case 'en': locale = 'en-US'; break;
-        case 'ja': locale = 'ja-JP'; break;
-        case 'zh': locale = 'zh-CN'; break;
-        case 'ar': locale = 'ar-EG'; break;
-        case 'ko':
-        default:   locale = 'ko-KR';
-    }
-
-    timeSpan.textContent = new Date(createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: true }); // <--- (1) locale 변수 사용, hour12:true 추가
+    timeSpan.textContent = new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     metaContainer.appendChild(timeSpan);
 
     if (isMyMessage) {
@@ -1657,7 +1395,7 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
                 const announceIcon = document.createElement('span');
                 announceIcon.className = 'menu-option-icon';
                 announceIcon.innerHTML = '📢';
-                announceIcon.title = translations['titleAnnounce'][currentLanguage];
+                announceIcon.title = '이 글을 공지로';
                 announceIcon.onclick = () => openAnnounceConfirmModal(msg);
                 optionsPopup.appendChild(announceIcon);
             }
@@ -1693,14 +1431,14 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
             const replyIcon = document.createElement('span');
             replyIcon.className = 'menu-option-icon';
             replyIcon.innerHTML = '↩️';
-            replyIcon.title = translations['titleReply'][currentLanguage];
+            replyIcon.title = '답장하기';
             replyIcon.onclick = () => startReply(id, senderNickname, content);
 
             // 2. '번역 불러오기' 아이콘
             const translateIcon = document.createElement('span');
             translateIcon.className = 'menu-option-icon';
             translateIcon.innerHTML = '🌐'; // 지구본 아이콘 또는 'T' 등
-            translateIcon.title = translations['titleLoadTranslation'][currentLanguage];
+            translateIcon.title = '번역 불러오기';
             translateIcon.onclick = () => toggleSavedTranslation(id, msg);
 
             optionsPopup.appendChild(replyIcon);
@@ -1713,7 +1451,7 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
                 const announceIcon = document.createElement('span');
                 announceIcon.className = 'menu-option-icon';
                 announceIcon.innerHTML = '📢';
-                announceIcon.title = translations['titleAnnounce'][currentLanguage];
+                announceIcon.title = '이 글을 공지로';
                 announceIcon.onclick = () => openAnnounceConfirmModal(msg);
                 optionsPopup.appendChild(announceIcon);
             }
@@ -1756,37 +1494,16 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
     const targetPopup = document.getElementById(`options-${messageId}`);
     if(targetPopup) targetPopup.classList.toggle('hidden');
 }
-function showEditInput(messageId, messageBubbleElement) {
+    function showEditInput(messageId, messageBubbleElement) {
     toggleOptionsMenu(messageId);
-
-    // [수정] .textContent 대신 .message-text-content 내부의 텍스트를 가져옵니다.
-    // (답장/번역 토글 시에도 원본 텍스트를 수정할 수 있도록)
-    const textElement = messageBubbleElement.querySelector('.message-text-content');
-    const currentText = (textElement) ? textElement.textContent : messageBubbleElement.textContent; // (이미지/파일이 아닐 경우 textElement가 있음)
-
+    const currentText = messageBubbleElement.textContent;
     messageBubbleElement.style.display = 'none';
     const editContainer = document.createElement('div'); editContainer.className = 'edit-container';
     const editInput = document.createElement('input'); editInput.type = 'text'; editInput.value = currentText;
-
-    const saveBtn = document.createElement('button');
-    // [변경] 번역 키 사용
-    saveBtn.textContent = translations['btnSave'][currentLanguage]; // '저장'
-    saveBtn.onclick = () => sendEditMessage(messageId, editInput.value, messageBubbleElement);
-
-    const cancelBtn = document.createElement('button');
-    // [변경] 번역 키 사용 (재사용)
-    cancelBtn.textContent = translations['btnCancel'][currentLanguage]; // '취소'
-    cancelBtn.onclick = () => {
-        // '수정' UI를 제거
-        if (editContainer.parentElement) {
-            editContainer.parentElement.removeChild(editContainer);
-        }
-        // 원래 메시지 버블을 다시 보여줌
-        messageBubbleElement.style.display = 'block';
-    };
-
+    const saveBtn = document.createElement('button'); saveBtn.textContent = '저장'; saveBtn.onclick = () => sendEditMessage(messageId, editInput.value);
+    const cancelBtn = document.createElement('button'); cancelBtn.textContent = '취소';
+    cancelBtn.onclick = () => { messageBubbleElement.parentElement.removeChild(editContainer); messageBubbleElement.style.display = 'block'; };
     editContainer.appendChild(editInput); editContainer.appendChild(saveBtn); editContainer.appendChild(cancelBtn);
-    // 메시지 버블의 *부모* (bubble-wrapper)에 editContainer를 추가
     messageBubbleElement.parentElement.appendChild(editContainer);
     editInput.focus();
 }
@@ -1819,56 +1536,37 @@ function sendEditMessage(messageId, newContent) {
         messageBubbleElement.style.display = 'block';
     }
 }
-async function sendDeleteMessage(messageId) {
-    const action = await showChoiceModal(
-        translations['modalDeleteMessageTitle'][currentLanguage], // "메시지 삭제"
-        translations['modalDeleteMessageDesc'][currentLanguage],  // "메시지를 삭제하시겠습니까?"
-        translations['btnCancel'][currentLanguage],               // "취소" (재사용)
-        translations['btnDelete'][currentLanguage]
-    );
-    if (action === '2') {
-        if (websocket?.readyState === WebSocket.OPEN) {
-            websocket.send(JSON.stringify({ type: 'DELETE_MESSAGE', messageId: messageId }));
-        }
-    }
+    function sendDeleteMessage(messageId) {
+    if (confirm('메시지를 삭제하시겠습니까?')) {
+    if (websocket?.readyState === WebSocket.OPEN) { websocket.send(JSON.stringify({ type: 'DELETE_MESSAGE', messageId: messageId })); }
 }
-
-async function leaveCurrentRoom() {
-    if (!currentRoomId || !currentUser) return;
-
+}
+    async function inviteUserToCurrentRoom() {
+    const usernameToInvite = prompt("초대할 사용자의 아이디를 입력하세요:");
+    if (!usernameToInvite || !currentRoomId) return;
     try {
-        const response = await fetch(`/api/chatrooms/${currentRoomId}/leave`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser })
-        });
-
-        // [변경] (로그인/프로필수정과 동일한 로직)
-        if (response.ok) {
-            // [성공] (성공 토스트 추가)
-            showToast(translations['toastLeaveRoomSuccess'][currentLanguage], 'success');
-            showMainScreen(); // 메인 화면으로 돌아가기
-            currentRoomId = null;
-        } else {
-            // [실패]
-            const errorKey = await response.text(); // Java가 "CHATROOM_NOT_FOUND_ERROR" 등을 보냄
-
-            if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                // (Case 1) 번역 키가 있으면 (예: "당신은 이 채팅방의 멤버가 아닙니다.")
-                showToast(translations[errorKey][currentLanguage], 'error');
-            } else {
-                // (Case 2) 번역 키가 없으면
-                const errorTemplate = translations['toastLeaveRoomFail'][currentLanguage]; // '방 나가기 실패'
-                showToast(`${errorTemplate}: ${errorKey}`, 'error');
-            }
-        }
-    } catch (error) {
-        // [네트워크 오류]
-        console.error('채팅방 나가기 오류:', error);
-        // [변경] 번역 키 사용
-        const errorTemplate = translations['toastLeaveRoomFail'][currentLanguage]; // '방 나가기 실패'
-        showToast(`${errorTemplate}: ${error.message}`, 'error');
-    }
+    const response = await fetch(`/api/chatrooms/${currentRoomId}/invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usernameToInvite: usernameToInvite, invitedBy: currentUser })
+});
+    if (response.ok) { alert(`${usernameToInvite}님을 채팅방에 초대했습니다.`); }
+    else { const error = await response.text(); alert(`초대 실패: ${error}`); }
+} catch (error) { console.error("Invite failed:", error); alert("초대 중 오류가 발생했습니다."); }
+}
+    async function leaveCurrentRoom() {
+    if (!currentRoomId) return;
+    if (confirm('이 채팅방을 정말로 나가시겠습니까?')) {
+    try {
+    const response = await fetch(`/api/chatrooms/${currentRoomId}/leave`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser })
+});
+    if (response.ok) { showMainScreen(); }
+    else { const errorText = await response.text(); alert(`나가기 실패: ${errorText}`); }
+} catch (error) { console.error("Leave room failed:", error); alert("채팅방을 나가는 중 오류가 발생했습니다."); }
+}
 }
 
 function closeProfileEditModal() {
@@ -1879,7 +1577,7 @@ function closeProfileEditModal() {
 async function openParticipantsModal() {
     if (!currentRoomId) return;
 
-    DOM.participantsList.innerHTML = `<span class="loading-text">${translations['loadingParticipants'][currentLanguage]}</span>`;
+    DOM.participantsList.innerHTML = '불러오는 중...';
     DOM.participantsOverlay.classList.remove('hidden');
 
     // 1. 위에서 만든 fetchParticipants 함수를 호출하여 멤버 정보를 가져오고 전역 변수를 채웁니다.
@@ -1898,7 +1596,7 @@ async function openParticipantsModal() {
             DOM.participantsList.appendChild(item);
         });
     } else {
-        DOM.participantsList.innerHTML = `<span class="error-text">${translations['errorLoadParticipants'][currentLanguage]}</span>`;
+        DOM.participantsList.innerHTML = '참가자 정보를 불러오는 데 실패했습니다.';
     }
 }
 
@@ -1986,14 +1684,14 @@ function updateMessageInUI(updatedMsg) {
     }
 }
 async function handleDeleteAccount() {
-    const action = await showChoiceModal(
-        translations['modalDeleteAccountTitle'][currentLanguage], // "계정 탈퇴"
-        translations['modalDeleteAccountDesc'][currentLanguage],  // "정말로 계정을..."
-        translations['btnCancel'][currentLanguage],               // "취소" (재사용)
-        translations['btnConfirmDelete'][currentLanguage]         // "탈퇴" (새 키)
+    // [!] 매우 중요: 사용자에게 의사를 재확인합니다.
+    const confirmDelete = confirm(
+        "정말로 계정을 탈퇴하시겠습니까?\n\n" +
+        "모든 채팅방과 친구 목록에서 삭제되며,\n" +
+        "이 작업은 되돌릴 수 없습니다."
     );
 
-    if (action === '2' && currentUser) {
+    if (confirmDelete && currentUser) {
         try {
             const response = await fetch(`/api/users/${currentUser}`, {
                 method: 'DELETE',
@@ -2001,31 +1699,35 @@ async function handleDeleteAccount() {
                     'Content-Type': 'application/json'
                 }
             });
-
             if (response.ok) {
-                // [성공] 번역 키 사용
-                showToast(translations['toastDeleteAccountSuccess'][currentLanguage], 'success');
+                alert("계정이 성공적으로 탈퇴되었습니다.\n로그인 화면으로 돌아갑니다.");
                 closeModal(DOM.profileEditModal);
-                location.reload();
-            } else {
-                // [실패] (로그인/프로필수정과 동일한 로직)
-                closeModal(DOM.profileEditModal);
-                const errorKey = await response.text(); // Java가 "LOGIN_USER_NOT_FOUND" 등을 보냄
-
-                if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                    // (Case 1) 번역 키가 있으면 (예: "사용자를 찾을 수 없습니다.")
-                    showToast(translations[errorKey][currentLanguage], 'error');
-                } else {
-                    // (Case 2) 번역 키가 없으면
-                    const errorTemplate = translations['toastDeleteAccountFail'][currentLanguage]; // '계정 탈퇴에 실패했습니다.'
-                    showToast(`${errorTemplate}: ${errorKey}`, 'error');
+                if (websocket) {
+                    websocket.close();
+                    websocket = null;
                 }
+                if (roomEventSource) {
+                    roomEventSource.close();
+                    roomEventSource = null;
+                }
+                if (presenceEventSource) {
+                    presenceEventSource.close();
+                    presenceEventSource = null;
+                }
+
+                currentUser = null;
+                currentUserObject = null;
+                currentUserNickname = null;
+
+                showAuthScreen();
+            } else {
+                closeModal(DOM.profileEditModal);
+                alert("계정 탈퇴에 실패했습니다. 다시 시도해 주세요.");
             }
         } catch (error) {
-            // [네트워크 오류] 번역 키 사용
             closeModal(DOM.profileEditModal);
             console.error('Error deleting account:', error);
-            showToast(translations['toastDeleteAccountError'][currentLanguage], 'error');
+            alert("계정 탈퇴 중 오류가 발생했습니다.");
         }
     }
 }
@@ -2050,16 +1752,13 @@ async function openInviteFriendModal(roomId) {
     console.log(`🚀 친구 초대 모달 열기 시도. Room ID: ${roomId}, User: ${currentUser}`);
 
     if (!currentUser) {
-        // [변경] 번역 키 사용
-        showToast(translations['toastInvalidLogin'][currentLanguage], 'error');
+        alert("로그인 정보가 유효하지 않습니다.");
         return;
     }
 
     inviteFriendOverlay.classList.remove('hidden');
-    // [변경] 번역 키 사용 (재사용)
-    inviteFriendTitle.textContent = translations['modalInviteTitle'][currentLanguage];
-    // [변경] 번역 키 사용
-    inviteFriendList.innerHTML = `<li>${translations['loadingList'][currentLanguage]}</li>`;
+    inviteFriendTitle.textContent = '친구 초대';
+    inviteFriendList.innerHTML = `<li>친구 목록을 불러오는 중...</li>`;
 
     try {
         // 2. 친구 목록과 채팅방 멤버 목록 API를 동시에 호출합니다.
@@ -2068,54 +1767,32 @@ async function openInviteFriendModal(roomId) {
             fetch(`/api/chatrooms/${roomId}/members`)
         ]);
 
-        // 3. [핵심] 친구 목록 API 응답 확인 (로그인/프로필수정과 동일한 로직)
+        // 3. [핵심] 각 API 응답이 '성공'했는지 명확하게 확인합니다.
         if (!friendsResponse.ok) {
-            const errorKey = await friendsResponse.text(); // Java가 "LOGIN_USER_NOT_FOUND" 등을 보냄
-
-            if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                // (Case 1) 번역 키가 있으면 (예: "사용자를 찾을 수 없습니다.")
-                inviteFriendList.innerHTML = `<li class="no-results">${translations[errorKey][currentLanguage]}</li>`;
-            } else {
-                // (Case 2) 번역 키가 없으면
-                const errorTemplate = translations['errorLoadFriendsFail'][currentLanguage]; // '친구 목록 로딩 실패'
-                inviteFriendList.innerHTML = `<li class="no-results">${errorTemplate}: ${errorKey}</li>`;
-            }
-            return; // 함수 종료
+            // 실패했다면, 서버가 보낸 에러 메시지를 포함하여 즉시 에러를 발생시킵니다.
+            throw new Error(`친구 목록 로딩 실패: 서버가 ${friendsResponse.status} 코드로 응답했습니다.`);
         }
-
-        // 4. [핵심] 채팅방 멤버 API 응답 확인 (이것이 우리가 찾던 'CHATROOM_NOT_FOUND_ERROR' 처리)
         if (!membersResponse.ok) {
-            const errorKey = await membersResponse.text(); // Java가 "CHATROOM_NOT_FOUND_ERROR" 등을 보냄
-
-            if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                // (Case 1) 번역 키가 있으면 (예: "존재하지 않는 채팅방입니다.")
-                inviteFriendList.innerHTML = `<li class="no-results">${translations[errorKey][currentLanguage]}</li>`;
-            } else {
-                // (Case 2) 번역 키가 없으면
-                const errorTemplate = translations['errorLoadMembersFail'][currentLanguage]; // '채팅방 멤버 로딩 실패'
-                inviteFriendList.innerHTML = `<li class="no-results">${errorTemplate}: ${errorKey}</li>`;
-            }
-            return; // 함수 종료
+            throw new Error(`채팅방 멤버 로딩 실패: 서버가 ${membersResponse.status} 코드로 응답했습니다.`);
         }
 
-        // 5. 두 응답이 모두 성공했을 때만, 안전하게 JSON 데이터를 추출합니다.
+        // 4. 두 응답이 모두 성공했을 때만, 안전하게 JSON 데이터를 추출합니다.
         const myFriends = await friendsResponse.json();
         const roomMembers = await membersResponse.json();
 
         console.log("✅ API 호출 성공. 친구 목록:", myFriends, "채팅방 멤버:", roomMembers);
 
-        // 6. 기존 로직을 수행하여 초대 가능한 친구 목록을 계산합니다.
+        // 5. 기존 로직을 수행하여 초대 가능한 친구 목록을 계산합니다.
         const memberUsernames = new Set(roomMembers.map(member => member.username));
         const availableFriends = myFriends.filter(friend => !memberUsernames.has(friend.username));
 
-        // 7. 계산된 목록을 화면에 그려줍니다.
+        // 6. 계산된 목록을 화면에 그려줍니다.
         renderInviteFriendList(availableFriends);
 
     } catch (error) {
-        // 8. 위 try 블록 내에서 발생한 모든 네트워크 실패 에러는 여기서 잡힙니다.
+        // 7. 위 try 블록 내에서 발생한 모든 에러(네트워크 실패 포함)는 여기서 잡힙니다.
         console.error("❌ 친구 초대 모달 처리 중 오류 발생:", error);
-        // [변경] 번역 키 사용
-        inviteFriendList.innerHTML = `<li class="no-results">${translations['errorLoadListFailed'][currentLanguage]}</li>`;
+        inviteFriendList.innerHTML = `<li class="no-results">목록을 불러오는 데 실패했습니다.</li>`;
     }
 }
 
@@ -2124,7 +1801,7 @@ function renderInviteFriendList(friends) {
     inviteFriendList.innerHTML = ''; // 기존 목록을 깨끗이 비웁니다.
 
     if (friends.length === 0) {
-        inviteFriendList.innerHTML = `<li class="no-results">${translations['noFriendsToInvite'][currentLanguage]}</li>`;
+        inviteFriendList.innerHTML = `<li class="no-results">초대할 친구가 없습니다.</li>`;
         return;
     }
 
@@ -2136,7 +1813,7 @@ function renderInviteFriendList(friends) {
                 <img src="${friend.profilePictureUrl || DEFAULT_PROFILE_PICTURE}" class="avatar">
                 <span class="nickname">${friend.nickname}</span>
             </div>
-            <button class="invite-action-button" data-username="${friend.username}">${translations['inviteButton'][currentLanguage]}</button>
+            <button class="invite-action-button" data-username="${friend.username}">초대</button>
         `;
         inviteFriendList.appendChild(li);
     });
@@ -2154,9 +1831,7 @@ function toggleSavedTranslation(messageId, msg) {
 
     // 3. 현재 언어에 맞는 저장된 번역이 없으면 사용자에게 알립니다.
     if (!savedTranslation) {
-        const toastMessage = translations['toastNoSavedTranslation'][currentLanguage]
-            .replace('{lang}', userLang.toUpperCase());
-        showToast(toastMessage, 'error');
+        alert(`'${userLang.toUpperCase()}' 언어로 저장된 번역이 없습니다.`);
         toggleOptionsMenu(messageId); // 메뉴 닫기
         return;
     }
@@ -2203,7 +1878,7 @@ async function searchMessages(keyword) {
         } else {
             DOM.searchNav.classList.remove('hidden');
             DOM.searchCount.textContent = "0 / 0";
-            showToast('검색 결과가 없습니다.', 'error');
+            alert('검색 결과가 없습니다.');
         }
     } catch (error) {
         console.error('검색 중 오류 발생:', error);
@@ -2275,8 +1950,7 @@ async function saveRoomProfileChanges() {
     const imageFile = DOM.roomEditFileInput.files[0];
 
     if (!newName) {
-        // [변경] 번역 키 사용
-        showToast(translations['toastRoomNameRequired'][currentLanguage], 'error');
+        alert('채팅방 이름은 비워둘 수 없습니다.');
         return;
     }
 
@@ -2287,43 +1961,29 @@ async function saveRoomProfileChanges() {
     }
 
     try {
-        formData.append('username', currentUser);
         const response = await fetch(`/api/chatrooms/${currentRoomId}/profile`, {
             method: 'POST',
+            headers: {
+                'X-Username': currentUser // 필요 시 인증 헤더 추가
+            },
             body: formData
         });
 
-        // [변경] (로그인/프로필수정과 동일한 로직)
-        if (response.ok) {
-            // [성공]
-            const updatedRoom = await response.json();
-
-            // UI 즉시 업데이트 (SSE 업데이트를 기다리지 않아도 됨)
-            DOM.chatRoomNameHeader.textContent = updatedRoom.name;
-            DOM.chatRoomProfileHeader.src = updatedRoom.profilePictureUrl || 'default-profile.png';
-
-            closeRoomEditModal();
-            // [변경] 번역 키 사용
-            showToast(translations['toastRoomUpdateSuccess'][currentLanguage], 'success');
-        } else {
-            // [실패]
-            const errorKey = await response.text(); // Java가 "PROFILE_UPLOAD_DIR_ERROR" 등을 보냄
-
-            if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                // (Case 1) 번역 키가 있으면 (예: "프로필 업로드 폴더...")
-                showToast(translations[errorKey][currentLanguage], 'error');
-            } else {
-                // (Case 2) 번역 키가 없으면
-                const errorTemplate = translations['toastRoomUpdateFail'][currentLanguage]; // '프로필 업데이트에 실패했습니다.'
-                showToast(`${errorTemplate}: ${errorKey}`, 'error');
-            }
+        if (!response.ok) {
+            throw new Error('프로필 업데이트에 실패했습니다.');
         }
+
+        const updatedRoom = await response.json();
+
+        // UI 즉시 업데이트 (SSE 업데이트를 기다리지 않아도 됨)
+        DOM.chatRoomNameHeader.textContent = updatedRoom.name;
+        DOM.chatRoomProfileHeader.src = updatedRoom.profilePictureUrl || 'default-profile.png';
+
+        closeRoomEditModal();
+        alert('채팅방 정보가 성공적으로 변경되었습니다.');
     } catch (error) {
-        // [네트워크 오류]
         console.error('Error updating room profile:', error);
-        // [변경] 번역 키 사용
-        const errorTemplate = translations['toastRoomUpdateFail'][currentLanguage]; // '프로필 업데이트에 실패했습니다.'
-        showToast(`${errorTemplate}: ${error.message}`, 'error');
+        alert(error.message);
     }
 }
 function applyChatRoomFilter() {
@@ -2340,26 +2000,19 @@ function applyChatRoomFilter() {
         }
     });
 }
-
 //공지
 function openAnnounceConfirmModal(message) {
     if (currentRoomAnnouncement) {
-        showToast(translations['toastMaxOneAnnouncement'][currentLanguage], 'error');
+        alert("공지는 하나씩만 게시 가능합니다.\n기존 공지를 먼저 내려주세요.");
         return;
     }
 
     // 공지할 내용을 전역 변수에 임시 저장
     let content = message.content;
     if (message.messageType === 'IMAGE') {
-        // [변경] 번역 키 사용 (prefixImage)
-        const prefix = translations['prefixImage'][currentLanguage];
-        // [변경] 번역 키 사용 (galleryImageFallbackTitle 재사용)
-        const fallbackName = translations['galleryImageFallbackTitle'][currentLanguage];
-        content = `${prefix} ${message.fileUrl ? message.fileUrl.split('/').pop() : fallbackName}`;
+        content = "[이미지] " + (message.fileUrl ? message.fileUrl.split('/').pop() : 'Image');
     } else if (message.messageType === 'FILE') {
-        // [변경] 번역 키 사용 (prefixFile)
-        const prefix = translations['prefixFile'][currentLanguage];
-        content = `${prefix} ${content}`; // 파일은 content에 파일명이 있음
+        content = "[파일] " + content; // 파일은 content에 파일명이 있음
     }
     messageToAnnounce = content; // '게시하기' 버튼이 누를 수 있도록 저장
 
@@ -2388,16 +2041,12 @@ function postAnnouncement() {
     closeAnnounceConfirmModal();
 }
 
-async function removeAnnouncement() {
-    const action = await showChoiceModal(
-        translations['modalRemoveAnnounceTitle'][currentLanguage], // "공지 내리기"
-        translations['modalRemoveAnnounceDesc'][currentLanguage],  // "공지를 내리시겠습니까?"
-        translations['btnCancel'][currentLanguage],                // "취소" (재사용)
-        translations['btnRemove'][currentLanguage]                 // "내리기"
-    );
-    if (action !== '2') {
+//'공지 내리기 (x)' 버튼 클릭 시
+function removeAnnouncement() {
+    if (!confirm("공지를 내리시겠습니까?")) {
         return;
     }
+
     if (websocket && websocket.readyState === WebSocket.OPEN) {
         // 백엔드로 message: null 을 보내 공지 삭제를 요청
         websocket.send(JSON.stringify({
@@ -2452,38 +2101,6 @@ function showAnnouncementBar() {
     isAnnouncementManuallyHidden = false; // '수동 숨김' 상태 해제
 }
 
-
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toast-container');
-
-    //  새 토스트 div 생성
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`; // 예: 'toast success'
-    toast.textContent = message;
-
-    //  컨테이너에 추가
-    container.appendChild(toast);
-
-    //  'show' 클래스를 추가하여 나타나는 애니메이션 실행
-    // (setTimeout을 10ms라도 줘야 CSS transition이 작동합니다)
-    setTimeout(() => {
-        toast.classList.add('show');
-    }, 10);
-
-    // 3초 뒤에 사라지는 애니메이션 실행
-    setTimeout(() => {
-        toast.classList.remove('show'); // 'show'를 제거하면 사라지는 애니메이션 실행
-
-        //  애니메이션이 끝난 후(0.4초) DOM에서 완전히 제거
-        toast.addEventListener('transitionend', () => {
-            if (toast.parentNode) { // (중복 제거 방지)
-                toast.parentNode.removeChild(toast);
-            }
-        });
-
-    }, 3000); // 3초 (3000ms)
-}
-
 //캘린더 패널에 FullCalendar를 그리는 함수
 let calendarInstance = null; // 중복 렌더링 방지용
 
@@ -2505,8 +2122,11 @@ function renderCalendar() {
         initialView: 'dayGridMonth',
         customButtons: {
             addEventButton: { // (버튼 이름)
+                text: '+', // (아이콘으로 대체될 임시 텍스트)
                 click: function() {
                     openPersonalEventModal();
+                    document.getElementById('personal-event-overlay').classList.remove('hidden');
+                    document.getElementById('personal-event-date').valueAsDate = new Date(); // (선택) 오늘 날짜 자동 입력
                 }
             }
         },
@@ -2516,7 +2136,7 @@ function renderCalendar() {
             right: 'addEventButton,prev,next'
         },
         height: '100%',
-        locale: currentLanguage,
+        locale: 'ko',
         eventDisplay: 'block',
         events: '/api/calendar/personal/' + currentUser, // 개인 일정 (R)
 
@@ -2540,13 +2160,13 @@ function renderCalendar() {
                 });
 
                 if (!response.ok) {
-                    throw new Error(translations['toastCalendarUpdateFail'][currentLanguage]);
+                    throw new Error('수정 권한이 없거나 서버 오류 발생');
                 }
                 // (성공 시 DB에 반영됨. UI는 이미 바뀌어 있음)
 
             } catch (error) {
                 console.error('날짜 변경 실패:', error);
-                showToast(error.message || translations['toastCalendarUpdateFail'][currentLanguage], 'error');
+                alert('날짜 변경에 실패했습니다. (권한 확인)');
                 info.revert(); // ✨ 실패 시, 드래그를 원위치시킴
             }
         },
@@ -2557,28 +2177,26 @@ function renderCalendar() {
         eventClick: async function(info) {
             const eventId = info.event.id;
             const eventTitle = info.event.title;
-            const action = await showChoiceModal(
-                `'${eventTitle}'`,                 // 모달 제목
-                translations['modalDeleteEventDesc'][currentLanguage],  // "이 일정을 '삭제'하시겠습니까?"
-                translations['btnCancel'][currentLanguage],             // "취소" (재사용)
-                translations['btnDelete'][currentLanguage]              // 버튼 2 (value: '2', 빨간색)
-            );
-            if (action === '2') {
+
+            // (참고: 나중에 "수정" 폼을 띄우려면 이 부분을 수정해야 함)
+            if (confirm(`'${eventTitle}' 일정을 "삭제"하시겠습니까?`)) {
                 try {
+                    // 1-4에서 만든 "삭제(DELETE)" API 호출 (권한은 백엔드가 검사)
                     const response = await fetch(`/api/calendar/${eventId}?userId=${currentUser}`, {
                         method: 'DELETE'
                     });
 
                     if (!response.ok) {
-                        throw new Error(translations['toastCalendarDeleteFail'][currentLanguage]);
+                        throw new Error('삭제 권한이 없거나 서버 오류 발생');
                     }
 
-                    showToast(translations['toastCalendarDeleteSuccess'][currentLanguage], 'success');
+                    // 성공 시 캘린더 UI 새로고침 (DB에서 지워졌으므로)
+                    alert('삭제되었습니다.');
                     calendarInstance.refetchEvents();
 
                 } catch (error) {
                     console.error('삭제 실패:', error);
-                    showToast(error.message || translations['toastCalendarDeleteFail'][currentLanguage], 'error');
+                    alert('삭제에 실패했습니다. (권한 확인)');
                 }
             }
         }
@@ -2599,12 +2217,13 @@ function renderRoomCalendar(roomId) {
     roomCalendarInstance = new FullCalendar.Calendar(calendarEl, {
         displayEventTime: true,
         initialView: 'dayGridMonth',
-        locale: currentLanguage,
+        locale: 'ko',
         height: '610px',
         eventDisplay: 'block',
         eventClassNames: 'custom-room-event',
         customButtons: {
             addEventButton: {
+                text: '+', // (CSS로 아이콘을 덮어쓸 예정)
                 click: function() {
                     // (3-3에서 추가할 함수를 호출)
                     openRoomEventModal();
@@ -2640,13 +2259,13 @@ function renderRoomCalendar(roomId) {
                 });
 
                 if (!response.ok) {
-                    throw new Error(translations['errorUpdatePermission'][currentLanguage]);
+                    throw new Error('수정 권한이 없거나 서버 오류 발생');
                 }
                 // (성공 시 DB에 반영됨)
 
             } catch (error) {
                 console.error('날짜 변경 실패:', error);
-                showToast(error.message || translations['toastRoomCalendarUpdateFail'][currentLanguage], 'error');
+                alert('날짜 변경에 실패했습니다. (채팅방 멤버 권한 확인)');
                 info.revert(); // ✨ 실패 시, 드래그를 원위치시킴
             }
         },
@@ -2656,55 +2275,56 @@ function renderRoomCalendar(roomId) {
          */
         eventClick: async function(info) {
             if (!currentUser) {
-                showToast(translations['toastLoginRequired'][currentLanguage], 'error');
+                alert('로그인이 필요합니다.');
                 return;
             }
 
             const eventId = info.event.id;
             const eventTitle = info.event.title;
 
-            const action = await showChoiceModal(
-                `${eventTitle}`,                 // 제목
-                translations['modalRoomEventActionDesc'][currentLanguage], // "이 일정으로 무엇을..."
-                translations['btnCopyCalendar'][currentLanguage],          // "내 캘린더로 복사"
-                translations['btnDelete'][currentLanguage]                 // 버튼 2 (value: '2')
-            );
+            // ✨ [핵심 수정] "복사" / "삭제" 선택창
+            const action = prompt(`'${eventTitle}'\n\n이 일정으로 무엇을 하시겠습니까?\n'1': 내 캘린더로 복사\n'2': 이 일정 삭제하기\n(1 또는 2 입력)`);
 
             if (action === '1') {
+                // --- (C) 기존 "복사" 로직 (7단계에서 만든 것) ---
                 try {
                     const response = await fetch(`/api/calendar/copy-to-personal/${eventId}?userId=${currentUser}`, { method: 'POST' });
                     if (response.ok) {
-                        showToast(translations['toastCopyCalendarSuccess'][currentLanguage], 'success');
+                        alert('개인 캘린더에 성공적으로 복사되었습니다.');
                         if (calendarInstance) calendarInstance.refetchEvents();
                     } else {
-                        showToast(translations['toastCopyCalendarFail'][currentLanguage], 'error');
+                        alert('일정 복사에 실패했습니다.');
                     }
                 } catch (error) {
                     console.error('Error copying event:', error);
-                    showToast(translations['toastCopyCalendarError'][currentLanguage], 'error');
+                    alert('복사 중 오류가 발생했습니다.');
                 }
 
             } else if (action === '2') {
-                // --- (D) "삭제" 로직 (중복 confirm() 제거) ---
-                try {
-                    // "삭제(DELETE)" API 호출
-                    const response = await fetch(`/api/calendar/${eventId}?userId=${currentUser}`, {
-                        method: 'DELETE'
-                    });
+                // --- (D) 신규 "삭제" 로직 ---
+                if (confirm(`정말로 공용 일정 '${eventTitle}'을(를) "삭제"하시겠습니까?\n이 작업은 모든 채팅방 멤버에게 영향을 줍니다.`)) {
+                    try {
+                        // 1-4에서 만든 "삭제(DELETE)" API 호출 (권한은 백엔드가 검사)
+                        const response = await fetch(`/api/calendar/${eventId}?userId=${currentUser}`, {
+                            method: 'DELETE'
+                        });
 
-                    if (!response.ok) {
-                        throw new Error(translations['errorDeletePermission'][currentLanguage]);
+                        if (!response.ok) {
+                            throw new Error('삭제 권한이 없거나 서버 오류 발생');
+                        }
+
+                        // 성공 시 "공용" 캘린더 UI 새로고침
+                        alert('공용 일정이 삭제되었습니다.');
+                        roomCalendarInstance.refetchEvents();
+
+                    } catch (error) {
+                        console.error('삭제 실패:', error);
+                        alert('삭제에 실패했습니다. (채팅방 멤버 권한 확인)');
                     }
-
-                    showToast(translations['toastRoomCalendarDeleteSuccess'][currentLanguage], 'success');
-                    roomCalendarInstance.refetchEvents();
-
-                } catch (error) {
-                    console.error('삭제 실패:', error);
-                    showToast(error.message || translations['toastRoomCalendarDeleteFail'][currentLanguage], 'error');
                 }
             }
         },
+
     });
 
     roomCalendarInstance.render();
@@ -2734,6 +2354,7 @@ function openRoomEventModal() {
 
     roomEventOverlay.classList.remove('hidden');
 }
+
 /**
  * '공용 일정 추가' 모달을 닫습니다.
  */
@@ -2756,17 +2377,18 @@ document.getElementById('save-room-event-button').addEventListener('click', asyn
     const time = roomEventTime.value || '00:00'; // 시간이 비면 자정(00:00)으로
 
     if (!title || !date) {
-        showToast(translations['toastNeedTitleDate'][currentLanguage], 'error');
+        alert('제목과 날짜를 모두 입력해주세요.');
         return;
     }
 
     if (!currentRoomId) {
-        showToast(translations['toastRoomNotSelected'][currentLanguage], 'error');
+        alert('채팅방이 선택되지 않았습니다. (오류)');
         return;
     }
 
     try {
         // 1. KST 날짜/시간을 UTC 표준시(ISO 문자열)로 변환
+        // (예: "2025-10-30T15:00:00" (KST) -> "2025-10-30T06:00:00.000Z" (UTC))
         const localDateTime = new Date(`${date}T${time}:00`);
         const utcIsoString = localDateTime.toISOString();
 
@@ -2780,212 +2402,20 @@ document.getElementById('save-room-event-button').addEventListener('click', asyn
             })
         });
 
-        // [변경] (로그인/프로필수정과 동일한 로직)
-        if (response.ok) {
-            // [성공]
-            closeRoomEventModal();
-            if (roomCalendarInstance) {
-                roomCalendarInstance.refetchEvents(); // 캘린더 UI 즉시 갱신
-            }
-            // [변경] 번역 키 사용
-            showToast(translations['toastRoomCalendarSaveSuccess'][currentLanguage], 'success');
-        } else {
-            // [실패]
-            const errorKey = await response.text(); // Java가 "CALENDAR_INVALID_DATE_FORMAT_ERROR" 등을 보냄
-
-            if (translations[errorKey] && translations[errorKey][currentLanguage]) {
-                // (Case 1) 번역 키가 있으면 (예: "잘못된 날짜 형식...")
-                showToast(translations[errorKey][currentLanguage], 'error');
-            } else {
-                // (Case 2) 번역 키가 없으면
-                const errorTemplate = translations['toastRoomCalendarSaveFail'][currentLanguage]; // '일정 생성 실패'
-                showToast(`${errorTemplate}: ${errorKey}`, 'error');
-            }
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`일정 생성 실패: ${errorText}`);
         }
+
+        // 3. 성공 시 모달 닫기 및 캘린더 새로고침
+        closeRoomEventModal();
+        if (roomCalendarInstance) {
+            roomCalendarInstance.refetchEvents(); // 캘린더 UI 즉시 갱신
+        }
+        alert('공용 일정이 추가되었습니다.');
 
     } catch (error) {
-        // [네트워크 오류]
         console.error('공용 일정 저장 실패:', error);
-        // [변경] 번역 키 사용
-        const errorTemplate = translations['toastRoomCalendarSaveError'][currentLanguage];
-        showToast(`${errorTemplate}: ${error.message}`, 'error');
-    }
-});
-function applyTranslations() {
-    const lang = currentLanguage; // script.js 상단에 'let currentLanguage = 'ko';' 변수가 있어야 합니다.
-
-    if (!translations) {
-        console.error("번역 객체(translations)를 찾을 수 없습니다.");
-        return;
-    }
-
-    // 1. [data-translate-key] (일반 텍스트 번역)
-    document.querySelectorAll('[data-translate-key]').forEach(element => {
-        const key = element.getAttribute('data-translate-key');
-        if (translations[key] && translations[key][lang]) {
-            element.textContent = translations[key][lang];
-        }
-    });
-
-    // (C) 공용 일정 모달의 제목
-    const roomEventTitleInput = document.getElementById('room-event-title');
-    if (roomEventTitleInput && translations['eventTitleLabel'] && translations['eventTitleLabel'][lang]) {
-        roomEventTitleInput.placeholder = translations['eventTitleLabel'][lang];
-    }
-
-    // (D) 개인 일정 모달의 제목
-    const personalEventTitleInput = document.getElementById('personal-event-title');
-    if (personalEventTitleInput && translations['eventTitleLabel'] && translations['eventTitleLabel'][lang]) {
-        // (주의: 공용 일정과 같은 'eventTitleLabel' 키를 재사용합니다)
-        personalEventTitleInput.placeholder = translations['eventTitleLabel'][lang];
-    }
-
-    // (E) 채팅방 설정 모달의 채팅방 이름
-    const roomEditNameInput = document.getElementById('room-edit-name');
-    if (roomEditNameInput && translations['placeholderRoomName'] && translations['placeholderRoomName'][lang]) {
-        roomEditNameInput.placeholder = translations['placeholderRoomName'][lang];
-    }
-
-    // (F) 채팅 화면 입력창
-    const messageInput = document.getElementById('message-input');
-    if (messageInput && translations['messagePlaceholder'] && translations['messagePlaceholder'][lang]) {
-        messageInput.placeholder = translations['messagePlaceholder'][lang];
-    }
-
-    // (G) 채팅 검색창
-    const searchInput = document.getElementById('search-input');
-    if (searchInput && translations['placeholderSearchMessages'] && translations['placeholderSearchMessages'][lang]) {
-        searchInput.placeholder = translations['placeholderSearchMessages'][lang];
-    }
-
-    // 2. [data-translate-alt-key] (이미지 alt 속성 번역)
-    document.querySelectorAll('[data-translate-alt-key]').forEach(element => {
-        const key = element.getAttribute('data-translate-alt-key');
-        if (translations[key] && translations[key][lang]) {
-            element.alt = translations[key][lang];
-        }
-    });
-
-    // 3. [ID로 직접] Placeholder 번역
-
-    // (A) 프로필 설정 모달의 닉네임
-    const profileNicknameInput = document.getElementById('profile-edit-nickname');
-    if (profileNicknameInput && translations['nicknamePlaceholder'] && translations['nicknamePlaceholder'][lang]) {
-        profileNicknameInput.placeholder = translations['nicknamePlaceholder'][lang];
-    }
-
-    // (B) [기존] 로그인/회원가입 닉네임 (DOM.nicknameInput 등)
-    // (만약 DOM 객체로 관리하고 있다면 이 방식도 유효합니다)
-    if (window.DOM && DOM.nicknameInput && translations['nicknamePlaceholder']) {
-        DOM.nicknameInput.placeholder = translations['nicknamePlaceholder'][lang];
-    }
-    // --- (13) 공지 등록 확인 모달 ---
-    // (이 요소들이 DOM 객체에 정의되어 있는지 확인 필요)
-    const modalAnnounceTitle = document.querySelector('#announce-confirm-modal h2');
-    if (modalAnnounceTitle) modalAnnounceTitle.textContent = translations['modalAnnounceTitle'][lang];
-
-    const modalAnnounceDesc = document.querySelector('#announce-confirm-modal .modal-body p');
-    if (modalAnnounceDesc) modalAnnounceDesc.textContent = translations['modalAnnounceDesc'][lang];
-
-    const announceConfirmCancel = document.getElementById('announce-confirm-cancel');
-    if (announceConfirmCancel) announceConfirmCancel.textContent = translations['btnCancel'][lang]; // (재사용)
-
-    const announceConfirmPost = document.getElementById('announce-confirm-post');
-    if (announceConfirmPost) announceConfirmPost.textContent = translations['btnPost'][lang];
-}
-window.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM 로드 완료, 초기 번역을 적용합니다.");
-
-    // 1. 초기 번역 1회 실행 (기본값 'ko'로)
-    // (3단계에서 만드신 함수를 여기서 처음 "호출"합니다)
-    applyTranslations();
-
-    // 2. 로그인 화면의 언어 선택기(<select>)를 찾아서 이벤트 장착
-    // <select id="language-selector-auth">
-    const languageSelectorAuth = document.getElementById('language-selector-auth');
-
-    if (languageSelectorAuth) {
-        // 이 선택기의 값이 'change' (변경)될 때마다
-        languageSelectorAuth.addEventListener('change', (e) => {
-
-            // script.js 맨 위에 있는 'currentLanguage' 전역 변수 값을
-            // 선택된 값(en, ja 등)으로 변경
-            currentLanguage = e.target.value;
-
-            // 3단계에서 만든 번역 함수 "호출"
-            applyTranslations();
-        });
-    }
-
-    // 3. (나중에 추가) 메인 화면의 언어 선택기에도 동일하게 적용
-    // (메인 화면의 <select> ID가 'language-selector-main'이 맞는지 확인 필요)
-    const languageSelectorMain = document.getElementById('language-selector-main');
-    if (languageSelectorMain) {
-        languageSelectorMain.addEventListener('change', (e) => {
-            currentLanguage = e.target.value;
-            applyTranslations();
-        });
-    }
-    // 4. [ID로 직접] Title (Tooltip) 번역
-    const showAnnouncementBtn = document.getElementById('show-announcement-btn');
-    if (showAnnouncementBtn && translations['titleViewAnnouncement'] && translations['titleViewAnnouncement'][lang]) {
-        showAnnouncementBtn.title = translations['titleViewAnnouncement'][lang];
-    }
-
-    const roomCalendarButton = document.getElementById('room-calendar-button');
-    if (roomCalendarButton && translations['titleSharedCalendar'] && translations['titleSharedCalendar'][lang]) {
-        roomCalendarButton.title = translations['titleSharedCalendar'][lang];
-    }
-
-    const roomGalleryButton = document.getElementById('room-gallery-button');
-    if (roomGalleryButton && translations['modalGalleryTitle'] && translations['modalGalleryTitle'][lang]) {
-        // (주의: '파일 보관함' 모달 제목 키 재사용)
-        roomGalleryButton.title = translations['modalGalleryTitle'][lang];
-    }
-
-    const hideAnnouncementBtn = document.getElementById('hide-announcement-btn');
-    if (hideAnnouncementBtn && translations['titleHideAnnouncement'] && translations['titleHideAnnouncement'][lang]) {
-        hideAnnouncementBtn.title = translations['titleHideAnnouncement'][lang];
-    }
-
-    const removeAnnouncementBtn = document.getElementById('remove-announcement-btn');
-    if (removeAnnouncementBtn && translations['titleRemoveAnnouncement'] && translations['titleRemoveAnnouncement'][lang]) {
-        removeAnnouncementBtn.title = translations['titleRemoveAnnouncement'][lang];
-    }
-    // --- 공지 등록 확인 모달 (이벤트 리스너 3개 추가) ---
-
-// 1. '게시' 버튼 (가장 중요)
-    const announceConfirmPostBtn = document.getElementById('announce-confirm-post');
-    if (announceConfirmPostBtn) {
-        announceConfirmPostBtn.addEventListener('click', () => {
-            if (websocket && websocket.readyState === WebSocket.OPEN && messageToAnnounce) {
-                // 백엔드로 공지 등록 요청
-                websocket.send(JSON.stringify({
-                    type: "UPDATE_ANNOUNCEMENT",
-                    message: messageToAnnounce // (openAnnounceConfirmModal에서 저장해둔 내용)
-                }));
-            }
-            // 모달 닫기
-            DOM.announceConfirmOverlay.classList.add('hidden');
-            messageToAnnounce = null; // 임시 내용 비우기
-        });
-    }
-
-// 2. '취소' 버튼
-    const announceConfirmCancelBtn = document.getElementById('announce-confirm-cancel');
-    if (announceConfirmCancelBtn) {
-        announceConfirmCancelBtn.addEventListener('click', () => {
-            DOM.announceConfirmOverlay.classList.add('hidden');
-            messageToAnnounce = null; // 임시 내용 비우기
-        });
-    }
-
-// 3. 'X' 닫기 버튼
-    const closeAnnounceConfirmBtn = document.getElementById('close-announce-confirm-modal');
-    if (closeAnnounceConfirmBtn) {
-        closeAnnounceConfirmBtn.addEventListener('click', () => {
-            DOM.announceConfirmOverlay.classList.add('hidden');
-            messageToAnnounce = null; // 임시 내용 비우기
-        });
+        alert('오류가 발생했습니다: ' + error.message);
     }
 });

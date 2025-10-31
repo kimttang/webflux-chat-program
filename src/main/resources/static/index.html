@@ -22,7 +22,7 @@
             </select>
         </div>
         <div id="login-form" class="form-container">
-            <img src="resource/icon/logo.png" alt="Logo" class="auth-logo" data-translate-alt-key="altLogo">
+            <img src="resource/icon/logo.png" alt="로고" class="auth-logo">
             <div class="input-group"><input type="text" id="login-username"></div>
             <div class="input-group"><input type="password" id="login-password"></div>
             <button id="login-button" class="auth-button"></button>
@@ -47,16 +47,16 @@
                     <span id="username-display"></span>
                 </div>
                 <div id="chat-filter-buttons" class="filter-buttons hidden">
-                    <button id="show-all-chats-button" class="filter-button active" data-translate-key="btnFilterAll">전체</button>
-                    <button id="show-unread-chats-button" class="filter-button" data-translate-key="btnFilterUnread">안읽음</button>
+                    <button id="show-all-chats-button" class="filter-button active">전체</button>
+                    <button id="show-unread-chats-button" class="filter-button">안읽음</button>
                 </div>
                 <div class="header-icons-right">
-                    <input type="text" id="friend-search-input" class="search-input hidden" placeholder="">
+                    <input type="text" id="friend-search-input" class="search-input hidden" placeholder="닉네임으로 검색...">
                     <div id="default-header-icons" class="icon-group">
-                        <button id="show-create-room-button" class="icon-button hidden" title="">
+                        <button id="show-create-room-button" class="icon-button hidden" title="새 채팅방">
                             <i class="fas fa-comment-medical"></i>
                         </button>
-                        <button id="show-add-friend-button" class="icon-button hidden" title="">
+                        <button id="show-add-friend-button" class="icon-button hidden" title="친구 추가">
                             <i class="fas fa-user-plus"></i>
                         </button>
                         <button id="show-friend-search-button" class="icon-button">
@@ -83,7 +83,7 @@
             </div>
             <div id="calendar-action-area" class="hidden">
                 <button id="add-personal-event-button" class="button" style="width: 100%;">
-                    <i class="fas fa-plus"></i> <span data-translate-key="btnAddPersonalEvent">새 일정 추가</span>
+                    <i class="fas fa-plus"></i> 새 일정 추가
                 </button>
             </div>
             <div class="tabs">
@@ -97,50 +97,50 @@
         <div class="header">
             <button id="back-to-main" class="back-button"><i class="fas fa-chevron-left"></i></button>
             <div id="chat-header-info">
-                <img id="chat-room-profile-header" src="" alt="Room Profile" class="header-profile-pic" data-translate-alt-key="altRoomProfile">
+                <img id="chat-room-profile-header" src="" alt="Room Profile" class="header-profile-pic">
                 <span id="chat-room-name-header"></span>
             </div>
-            <button id="show-announcement-btn" class="icon-button hidden" title=""><i class="fas fa-bullhorn"></i></button>
+            <button id="show-announcement-btn" class="icon-button hidden" title="공지 보기"><i class="fas fa-bullhorn"></i></button>
             <span id="search-icon"><i class="fas fa-search"></i></span>
             <button id="header-menu-btn" class="icon-button">
                 <i class="fas fa-ellipsis-h"></i>
             </button>
             <div id="header-menu-popup" class="header-popup hidden">
-                <button id="room-calendar-button" title="">
-                    <i class="fas fa-calendar-alt"></i> <span data-translate-key="menuCalendar">캘린더</span>
+                <button id="room-calendar-button" title="공용 캘린더">
+                    <i class="fas fa-calendar-alt"></i> <span>캘린더</span>
                 </button>
-                <button id="room-gallery-button" title="">
-                    <i class="fas fa-folder-open"></i> <span data-translate-key="menuGallery">사진/파일</span>
+                <button id="room-gallery-button" title="파일 보관함">
+                    <i class="fas fa-folder-open"></i> <span>사진/파일</span>
                 </button>
                 <button id="open-members-btn">
-                    <i class="fas fa-users"></i> <span data-translate-key="menuViewParticipants">대화상대 보기</span>
+                    <i class="fas fa-users"></i> <span>대화상대 보기</span>
                 </button>
                 <button id="open-invite-btn">
-                    <i class="fas fa-user-plus"></i> <span data-translate-key="menuInviteParticipants">대화상대 초대</span>
+                    <i class="fas fa-user-plus"></i> <span>대화상대 초대</span>
                 </button>
                 <hr class="popup-divider">
                 <button id="leave-room-btn" class="text-danger">
-                    <i class="fas fa-door-open"></i> <span data-translate-key="leaveButton">채팅방 나가기</span>
+                    <i class="fas fa-door-open"></i> <span>채팅방 나가기</span>
                 </button>
             </div>
         </div>
         <div id="announcement-bar" class="announcement-bar hidden">
             <i class="fas fa-bullhorn"></i>
             <span id="announcement-content"></span>
-            <button id="hide-announcement-btn" title=""><i class="fas fa-chevron-down"></i></button>
-            <button id="remove-announcement-btn" title="">&times;</button>
+            <button id="hide-announcement-btn" title="공지 숨기기"><i class="fas fa-chevron-down"></i></button>
+            <button id="remove-announcement-btn" title="공지 내리기">&times;</button>
         </div>
         <div id="search-bar" class="search-bar hidden">
-            <input type="text" id="search-input" placeholder="">
+            <input type="text" id="search-input" placeholder="메시지 검색...">
             <span id="search-nav">
-    <span id="search-count">0 / 0</span>
-    <button id="search-prev-button">
-        <i class="fas fa-chevron-up"></i>
-    </button>
-    <button id="search-next-button">
-        <i class="fas fa-chevron-down"></i>
-    </button>
-</span>
+        <span id="search-count">0 / 0</span>
+        <button id="search-prev-button">
+            <i class="fas fa-chevron-up"></i>
+        </button>
+        <button id="search-next-button">
+            <i class="fas fa-chevron-down"></i>
+        </button>
+    </span>
         </div>
         <div id="chat-window" class="chat-window"></div>
         <div id="typing-indicator" class="typing-indicator"></div>
@@ -155,37 +155,34 @@
             <input type="file" id="file-input" class="hidden"><button id="upload-button" class="upload-button"><i class="fas fa-file-medical"></i></button>
             <button id="translate-button"><i class="fas fa-language"></i></button>
             <select id="language-select">
-                <option id="lang-none" value="" data-translate-key="langNone"></option>
-                <option id="lang-en" value="en" data-translate-key="langEn"></option>
-                <option id="lang-ja" value="ja" data-translate-key="langJa"></option>
-                <option id="lang-zh" value="zh" data-translate-key="langZh"></option>
-                <option id="lang-ar" value="ar" data-translate-key="langAr"></option>
+                <option id="lang-none" value=""></option><option id="lang-en" value="en"></option><option id="lang-ja" value="ja"></option><option id="lang-zh" value="zh"></option><option id="lang-ar" value="ar"></option>
             </select>
-            <input type="text" id="message-input" placeholder=""><button id="send-button"><i class="fas fa-paper-plane"></i></button>
+            <input type="text" id="message-input"><button id="send-button"><i class="fas fa-paper-plane"></i></button>
         </div>
     </div>
 </div>
 <div id="profile-edit-overlay" class="modal-overlay hidden"> <div id="profile-edit-modal" class="modal">
     <div class="modal-header">
-        <h2 data-translate-key="modalProfileSettingsTitle">프로필 설정</h2>
+        <h2>프로필 설정</h2>
         <button id="close-profile-edit-modal" class="close-button">&times;</button>
     </div>
     <div class="modal-content profile-edit-content">
-        <img id="profile-edit-preview" src="" alt="Profile Preview" data-translate-alt-key="altProfilePreview">
+        <img id="profile-edit-preview" src="" alt="Profile Preview">
         <input type="file" id="profile-edit-file-input" class="hidden" accept="image/*">
-        <button id="profile-edit-picture-button" class="button" data-translate-key="btnChangePicture">사진 변경</button>
-        <input type="text" id="profile-edit-nickname"> <div class="profile-edit-buttons">
-        <button id="profile-edit-cancel" class="button" data-translate-key="btnCancel">취소</button>
-        <button id="profile-edit-save" class="button" data-translate-key="btnSave">저장</button>
-    </div>
-        <button id="account-delete-button" class="button button-danger button-small" data-translate-key="btnDeleteAccount">계정 탈퇴</button>
+        <button id="profile-edit-picture-button" class="button">사진 변경</button>
+        <input type="text" id="profile-edit-nickname">
+        <div class="profile-edit-buttons">
+            <button id="profile-edit-cancel" class="button">취소</button>
+            <button id="profile-edit-save" class="button">저장</button>
+        </div>
+        <button id="account-delete-button" class="button button-danger button-small">계정 탈퇴</button>
     </div>
 </div>
 </div>
 <div id="participants-overlay" class="modal-overlay hidden">
     <div id="participants-modal" class="modal">
         <div class="modal-header">
-            <h2 id="participants-title" data-translate-key="modalParticipantsTitle">대화 상대</h2>
+            <h2 id="participants-title">대화 상대</h2>
             <button id="close-participants-modal" class="close-button">&times;</button>
         </div>
         <div id="participants-list" class="modal-content">
@@ -195,7 +192,7 @@
 <div id="invite-friend-overlay" class="modal-overlay hidden">
     <div id="invite-friend-modal" class="modal">
         <div class="modal-header">
-            <h2 id="invite-friend-title" data-translate-key="modalInviteTitle">친구 초대</h2>
+            <h2 id="invite-friend-title">친구 초대</h2>
             <button id="close-invite-modal-button" class="close-modal-button">&times;</button>
         </div>
         <div class="modal-body"><ul id="invite-friend-list" class="user-list"></ul></div>
@@ -204,17 +201,17 @@
 <div id="room-edit-overlay" class="modal-overlay hidden">
     <div id="room-edit-modal" class="modal">
         <div class="modal-header">
-            <h2 data-translate-key="modalRoomSettingsTitle">채팅방 설정</h2>
+            <h2>채팅방 설정</h2>
             <button id="close-room-edit-modal" class="close-button">&times;</button>
         </div>
         <div class="modal-content profile-edit-content">
-            <img id="room-edit-preview" src="" alt="Room Picture Preview" data-translate-alt-key="altRoomEditPreview">
+            <img id="room-edit-preview" src="" alt="Profile Preview">
             <input type="file" id="room-edit-file-input" class="hidden" accept="image/*">
-            <button id="room-edit-picture-button" class="button" data-translate-key="btnChangePicture">사진 변경</button>
+            <button id="room-edit-picture-button" class="button">사진 변경</button>
             <input type="text" id="room-edit-name" placeholder="새 채팅방 이름">
             <div class="profile-edit-buttons">
-                <button id="room-edit-cancel-button" class="button" data-translate-key="btnCancel">취소</button>
-                <button id="room-edit-save-button" class="button" data-translate-key="btnSave">저장</button>
+                <button id="room-edit-cancel-button" class="button">취소</button>
+                <button id="room-edit-save-button" class="button">저장</button>
             </div>
         </div>
     </div>
@@ -226,19 +223,19 @@
             <button id="close-announce-confirm-modal" class="close-modal-button">&times;</button>
         </div>
         <div class="modal-body">
-            <p>공지로 등록하겠습니까?</p>
+            <p>이 메시지를 공지로 등록하시겠습니까?</p>
             <blockquote id="announce-confirm-content"></blockquote>
         </div>
         <div class="modal-buttons">
             <button id="announce-confirm-cancel" class="button button-secondary">취소</button>
-            <button id="announce-confirm-post" class="button">게시</button>
+            <button id="announce-confirm-post" class="button">게시하기</button>
         </div>
     </div>
 </div>
 <div id="room-calendar-overlay" class="overlay hidden">
     <div id="room-calendar-modal" class="modal modal-large">
         <div class="modal-header">
-            <h2 id="room-calendar-title" data-translate-key="modalRoomCalendarTitle">채팅방 공용 캘린더</h2>
+            <h2 id="room-calendar-title">채팅방 공용 캘린더</h2>
             <button id="close-room-calendar-modal" class="close-button">&times;</button>
         </div>
         <div class="modal-body">
@@ -249,7 +246,7 @@
 <div id="personal-event-overlay" class="overlay hidden">
     <div id="personal-event-modal" class="modal">
         <div class="modal-header">
-            <h2 data-translate-key="modalPersonalEventTitle">일정 추가</h2>
+            <h2>일정 추가</h2>
             <button id="close-personal-event-modal" class="close-button">&times;</button>
         </div>
         <div class="modal-body">
@@ -266,15 +263,15 @@
             </div>
         </div>
         <div class="modal-buttons">
-            <button id="cancel-personal-event-button" class="button button-secondary" data-translate-key="btnCancel">취소</button>
-            <button id="save-personal-event-button" class="button" data-translate-key="btnSave">저장</button>
+            <button id="cancel-personal-event-button" class="button button-secondary">취소</button>
+            <button id="save-personal-event-button" class="button">저장</button>
         </div>
     </div>
 </div>
 <div id="room-event-overlay" class="overlay hidden">
     <div id="room-event-modal" class="modal">
         <div class="modal-header">
-            <h2 data-translate-key="modalRoomEventTitle">공용 일정 추가</h2>
+            <h2>공용 일정 추가</h2>
             <button id="close-room-event-modal" class="close-button">&times;</button>
         </div>
         <div class="modal-body">
@@ -292,21 +289,21 @@
             </div>
         </div>
         <div class="modal-buttons">
-            <button id="cancel-room-event-button" class="button button-secondary" data-translate-key="btnCancel">취소</button>
-            <button id="save-room-event-button" class="button" data-translate-key="btnSave">저장</button>
+            <button id="cancel-room-event-button" class="button button-secondary">취소</button>
+            <button id="save-room-event-button" class="button">저장</button>
         </div>
     </div>
 </div>
 <div id="room-gallery-overlay" class="overlay hidden">
     <div id="room-gallery-modal" class="modal modal-large">
         <div class="modal-header">
-            <h2 id="room-gallery-title" data-translate-key="modalGalleryTitle">파일 보관함</h2>
+            <h2 id="room-gallery-title">파일 보관함</h2>
             <button id="close-room-gallery-modal" class="close-button">&times;</button>
         </div>
 
         <div class="modal-tabs">
-            <button class="tab-link active" data-tab="gallery-images" data-translate-key="galleryTabImages">이미지</button>
-            <button class="tab-link" data-tab="gallery-files" data-translate-key="galleryTabFiles">파일</button>
+            <button class="tab-link active" data-tab="gallery-images">이미지</button>
+            <button class="tab-link" data-tab="gallery-files">파일</button>
         </div>
 
         <div class="modal-body">
@@ -314,43 +311,6 @@
             </div>
             <div id="gallery-files-content" class="gallery-list hidden">
             </div>
-        </div>
-    </div>
-</div>
-<div id="toast-container" class="toast-container"></div>
-<div id="choice-overlay" class="modal-overlay hidden">
-    <div id="choice-modal" class="modal">
-        <div class="modal-header">
-            <h2 id="choice-title">제목</h2>
-            <button id="choice-cancel-btn" class="close-button">&times;</button>
-        </div>
-        <div class="modal-body">
-            <p id="choice-description">설명...</p>
-        </div>
-        <div id="choice-buttons" class="modal-buttons">
-            <button id="choice-btn-1" class="button">선택 1</button>
-            <button id="choice-btn-2" class="button button-danger">선택 2</button>
-        </div>
-    </div>
-</div>
-<div id="friend-profile-overlay" class="modal-overlay hidden">
-    <div id="friend-profile-modal" class="modal">
-        <div class="modal-header">
-            <h2 data-translate-key="modalFriendProfileTitle">프로필</h2>
-            <button id="friend-profile-close-btn" class="close-button">&times;</button>
-        </div>
-        <div class="modal-body friend-profile-body">
-            <img src="https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png" id="friend-profile-pic" class="friend-profile-pic" alt="프로필 사진" data-translate-alt-key="altFriendProfilePicture">
-
-            <h3 id="friend-profile-name" data-translate-key="friendProfileName">친구 이름</h3>
-        </div>
-        <div class="modal-buttons friend-profile-buttons">
-            <button id="friend-profile-dm-btn" class="button">
-                <i class="fas fa-comment"></i> <span data-translate-key="btnFriendProfileDM">1:1 채팅</span>
-            </button>
-            <button id="friend-profile-delete-btn" class="button button-danger">
-                <i class="fas fa-user-times"></i> <span data-translate-key="btnFriendProfileDelete">친구 삭제</span>
-            </button>
         </div>
     </div>
 </div>

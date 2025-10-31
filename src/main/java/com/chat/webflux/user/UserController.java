@@ -5,13 +5,12 @@ import com.chat.webflux.presence.PresenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextImpl;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ServerWebExchange;
-import reactor.core.publisher.Mono;
-
 import java.util.ArrayList;
 
 @RestController// 사용자(User) 관련 API (회원가입, 로그인, 프로필) 요청을 처리하는 컨트롤러
@@ -78,20 +77,6 @@ public class UserController {
                         Mono.just(ResponseEntity.badRequest().body(null))
                 );
     }
-
-    @DeleteMapping("/{currentUsername}/friends/{friendUsername}")
-    public Mono<ResponseEntity<Void>> deleteFriend(
-            @PathVariable String currentUsername,
-            @PathVariable String friendUsername) {
-
-        return userService.deleteFriend(currentUsername, friendUsername)
-                .thenReturn(ResponseEntity.ok().<Void>build()) // 성공 시 200 OK
-                .onErrorResume(IllegalArgumentException.class, e ->
-                        // 사용자를 찾을 수 없는 경우 404 Not Found
-                        Mono.just(ResponseEntity.notFound().build())
-                );
-    }
-
     // (DELETE) 회원 탈퇴 API
     @DeleteMapping("/{username}")
     public Mono<ResponseEntity<Void>> deleteUser(@PathVariable String username) {
