@@ -140,7 +140,7 @@ public class ChatRoomService {
     //특정 채팅방에 속한 모든 멤버(User)의 상세 정보를 조회
     public Flux<User> getChatRoomMembers(String roomId) {
         return chatRoomRepository.findById(roomId)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("존재하지 않는 채팅방입니다.")))
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("CHATROOM_NOT_FOUND_ERROR")))
                 .flatMapMany(chatRoom -> {
                     Set<String> memberUsernames = chatRoom.getMembers();
                     if (memberUsernames == null || memberUsernames.isEmpty()) {
@@ -154,72 +154,109 @@ public class ChatRoomService {
     public Mono<ChatRoom> inviteUserToChatRoom(String roomId, String usernameToInvite, String invitedBy) {
         // 1. 채팅방 정보와 초대할 사용자의 정보를 동시에 DB에서 가져옴
         Mono<ChatRoom> chatRoomMono = chatRoomRepository.findById(roomId)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("존재하지 않는 채팅방입니다.")));
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("CHATROOM_NOT_FOUND_ERROR")));
         Mono<User> userToInviteMono = userRepository.findByUsername(usernameToInvite)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("초대할 사용자를 찾을 수 없습니다.")));
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("INVITE_USER_NOT_FOUND_ERROR")));
 
         // 2. Mono.zip을 사용해 두 정보가 모두 로딩되면 다음 로직을 실행
         return Mono.zip(chatRoomMono, userToInviteMono)
                 .flatMap(tuple -> {
-                    ChatRoom chatRoom = tuple.getT1();
+                    ChatRoom currentRoom = tuple.getT1();
                     User userToInvite = tuple.getT2();
 
-                    if (!chatRoom.getMembers().contains(invitedBy)) {
-                        return Mono.error(new SecurityException("초대 권한이 없습니다."));
+                    // 3. [Validation]
+                    if (!currentRoom.getMembers().contains(invitedBy)) {
+                        return Mono.error(new SecurityException("INVITE_PERMISSION_DENIED_ERROR"));
                     }
-                    if (chatRoom.getMembers().contains(usernameToInvite)) {
-                        return Mono.error(new IllegalArgumentException("이미 채팅방에 참여하고 있는 사용자입니다."));
+                    if (currentRoom.getMembers().contains(usernameToInvite)) {
+                        return Mono.error(new IllegalArgumentException("INVITE_USER_ALREADY_IN_ROOM_ERROR"));
                     }
 
-                    // 3. 멤버 목록에 새로운 사용자를 추가
-                    chatRoom.getMembers().add(usernameToInvite);
+                    // 4. [THE CORE FIX] 현재 방이 DM 방인지 확인
+                    if (currentRoom.isDm()) {
+                        // 5. [FIX: Path A] DM 방이 맞습니다.
+                        // "새로운" 그룹 채팅방을 생성합니다.
 
-                    //채팅방 이름에 초대된 사용자의 닉네임을 추가
-                    // 기존 이름에 " & "와 새로운 닉네임을 붙여줍니다.
-                    chatRoom.setName(chatRoom.getName() + " & " + userToInvite.getNickname());
+                        // 5a. 새 방의 멤버 목록을 준비합니다. (기존 멤버 + 새 멤버)
+                        Set<String> newRoomMembers = new HashSet<>(currentRoom.getMembers());
+                        newRoomMembers.add(usernameToInvite); // [A, B, C]
 
-                    // 5. 변경된 멤버 목록과 이름을 DB에 저장
-                    return chatRoomRepository.save(chatRoom);
-                })
-                .doOnSuccess(this::broadcastToAllMembers); // 성공 시 모든 멤버에게 변경사항을 알림
+                        // 5b. 새 방의 이름을 만들기 위해 모든 멤버의 닉네임을 조회합니다.
+                        return userRepository.findByUsernameIn(new ArrayList<>(newRoomMembers))
+                                .map(User::getNickname)
+                                .collect(Collectors.joining(" & "))
+                                .flatMap(newRoomName -> {
+                                    // 5c. 새 그룹방 객체를 생성하고 저장합니다.
+                                    ChatRoom newGroupRoom = new ChatRoom();
+                                    // (ID는 MongoDB가 자동으로 생성하도록 null로 둡니다)
+                                    newGroupRoom.setName(newRoomName);
+                                    newGroupRoom.setMembers(newRoomMembers);
+                                    newGroupRoom.setCreatedAt(Instant.now());
+                                    newGroupRoom.setDm(false); // 👈 이것은 그룹 채팅방입니다.
+
+                                    return chatRoomRepository.save(newGroupRoom);
+                                })
+                                // 5d. 새 방의 모든 멤버에게 목록 갱신을 알립니다.
+                                .doOnSuccess(this::broadcastToAllMembers);
+
+                    } else {
+                        // 6. [FIX: Path B] 이미 그룹 채팅방입니다.
+                        // 기존 로직대로 현재 방에 멤버만 추가합니다.
+                        currentRoom.getMembers().add(usernameToInvite);
+
+                        // 7. 변경된 멤버 목록을 DB에 저장
+                        return chatRoomRepository.save(currentRoom)
+                                // 8. 현재 방의 모든 멤버에게 갱신을 알립니다.
+                                .doOnSuccess(this::broadcastToAllMembers);
+                    }
+                });
     }
 
     //채팅방에서 나간 후 남은 인원에 따라 방을 삭제하거나, 이름을 변경
     public Mono<Void> leaveChatRoom(String roomId, String username) {
         return chatRoomRepository.findById(roomId)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("존재하지 않는 채팅방입니다.")))
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("CHATROOM_NOT_FOUND_ERROR")))
                 .flatMap(chatRoom -> {
                     if (!chatRoom.getMembers().contains(username)) {
-                        return Mono.error(new SecurityException("당신은 이 채팅방의 멤버가 아닙니다."));
+                        return Mono.error(new SecurityException("LEAVE_ROOM_NOT_MEMBER_ERROR"));
                     }
+
+                    // 1. [중요] 방이 삭제되기 전, "모든" 멤버(A와 B) 목록을 미리 확보합니다.
+                    Set<String> allMembers = new HashSet<>(chatRoom.getMembers());
 
                     return userRepository.findByUsername(username)
                             .flatMap(leavingUser -> {
-                                // 나가는 사용자를 제외한 나머지 멤버 목록 생성
+                                // 2. 나가는 사용자를 제외한 나머지 멤버 목록 생성
                                 Set<String> remainingMembers = chatRoom.getMembers().stream()
                                         .filter(member -> !member.equals(username))
                                         .collect(Collectors.toSet());
 
-                                // 1. 이 방이 원래 DM방이었는지 확인 (ID에 '-'가 있으면 DM방)
-                                boolean isDmOriginated = chatRoom.getId().contains("-");
+                                boolean isDmRoom = chatRoom.isDm();
 
-                                // 2. 새로운 삭제 조건:
-                                //    - 멤버가 0명이 되거나 (기존 조건)
-                                //    - 또는, DM방이었는데 멤버가 1명만 남게 될 경우
-                                if (remainingMembers.isEmpty() || (isDmOriginated && remainingMembers.size() == 1)) {
+                                // 3. 방 삭제 조건 확인
+                                if (remainingMembers.isEmpty() || (isDmRoom && remainingMembers.size() == 1)) {
 
-                                    // 채팅방과 관련된 모든 데이터(메시지, 안읽음 카운트)를 삭제
-                                    return chatMessageRepository.deleteByRoomId(roomId)
-                                            .then(unreadCountRepository.deleteByRoomId(roomId))
+                                    // 4. [핵심 수정] "상대방(B)"의 카운트를 포함하여 *모든 멤버*의 카운트를 "찾아서" 삭제합니다.
+                                    Mono<Void> deleteAllUnreadCounts = Flux.fromIterable(allMembers)
+                                            .flatMap(memberUsername ->
+                                                    // (1) "A"의 카운트 *찾기*, "B"의 카운트 *찾기*
+                                                    unreadCountRepository.findByUserIdAndRoomId(memberUsername, roomId)
+                                            )
+                                            .flatMap(unreadCountDoc ->
+                                                    // (2) 찾은 문서를 *삭제*
+                                                    unreadCountRepository.delete(unreadCountDoc)
+                                            ).then(); // (모든 삭제가 끝날 때까지 대기)
+
+                                    // 5. 모든 unread_counts가 삭제된 *후에* 메시지와 채팅방을 삭제합니다.
+                                    return deleteAllUnreadCounts
+                                            .then(chatMessageRepository.deleteByRoomId(roomId))
                                             .then(chatRoomRepository.delete(chatRoom))
                                             .then(Mono.fromRunnable(() -> {
-                                                // 나간 사람과, 마지막으로 남았던 사람 모두에게 목록 업데이트를 알려줌
-                                                broadcastRoomListToUser(username);
-                                                if (!remainingMembers.isEmpty()) {
-                                                    remainingMembers.forEach(this::broadcastRoomListToUser);
-                                                }
+                                                // 6. 나간 사람과, 마지막으로 남았던 사람 모두에게 목록 업데이트를 알려줌
+                                                allMembers.forEach(this::broadcastRoomListToUser);
                                             }));
                                 } else {
+                                    // [정상] (방이 삭제되지 않는 경우)
                                     chatRoom.setMembers(remainingMembers);
 
                                     if (chatRoom.getName().contains(" & ")) {
@@ -238,7 +275,6 @@ public class ChatRoomService {
                             });
                 });
     }
-
     //채팅방의 프로필 정보(이름, 프로필 사진)를 수정
     public Mono<ChatRoom> updateChatRoomProfile(String roomId, String newName, Mono<FilePart> filePartMono) {
         return chatRoomRepository.findById(roomId)
@@ -251,7 +287,7 @@ public class ChatRoomService {
                                 try {
                                     Files.createDirectories(profileUploadPath);
                                 } catch (IOException e) {
-                                    return Mono.error(new RuntimeException("프로필 업로드 폴더를 생성할 수 없습니다.", e));
+                                    return Mono.error(new RuntimeException("PROFILE_UPLOAD_DIR_ERROR", e));
                                 }
 
                                 // 고유한 파일명 생성

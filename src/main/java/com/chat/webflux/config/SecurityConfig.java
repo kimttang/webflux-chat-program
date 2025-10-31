@@ -32,9 +32,14 @@ public class SecurityConfig {
                                 "/",
                                 "/index.html",
                                 "/style.css",
-                                "/script.js"
+                                "/script.js",
+                                "/utils.js",
+                                "/translations.js"
                         ).permitAll()
 
+
+                        // /img/ 폴더(기본 프로필 사진) 접근 허용
+                        .pathMatchers("/img/**").permitAll()
                         // 아이콘/로고 등 리소스 폴더 허용
                         .pathMatchers("/resource/**").permitAll()
                         // "회원가입"과 "로그인" API 경로 허용

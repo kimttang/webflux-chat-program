@@ -4,13 +4,16 @@ import com.chat.webflux.message.ChatMessage;
 import com.chat.webflux.user.User;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
+
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
+// 채팅 메시지 데이터를 프론트엔드로 전송하기 위한 DTO 클래스
 @Getter
 public class ChatMessageDto {
+    // ChatMessage 엔티티에서 복사되는 필드
     private final String id;
     private final String roomId;
     private final String sender;
@@ -47,7 +50,7 @@ public class ChatMessageDto {
         this.translations = (message.getTranslations() != null) ? message.getTranslations() : Collections.emptyMap();
     }
 
-    // 2. [핵심] 비상용 생성자 (String을 받음)
+    // 2. 비상용 생성자 (String을 받음)
     public ChatMessageDto(ChatMessage message, String fallbackSender) {
         this.id = message.getId();
         this.roomId = message.getRoomId();
@@ -65,9 +68,12 @@ public class ChatMessageDto {
         this.translations = (message.getTranslations() != null) ? message.getTranslations() : Collections.emptyMap();
     }
 
+    // 답장 메시지의 원본 메시지 DTO를 설정
     public void setRepliedMessageInfo(ChatMessageDto repliedMessageInfo) {
         this.repliedMessageInfo = repliedMessageInfo;
     }
+
+    // 채팅방의 총 멤버 수를 기준으로 "안 읽은 수"를 계산하여 설정
     public void setUnreadCount(int totalMembers) {
         if (this.readBy != null) {
             this.unreadCount = totalMembers - this.readBy.size();

@@ -1,3 +1,4 @@
+//이 클래스는 사용자 관련 비즈니스 로직의 "총사령관" 역할을 합니다. 단순한 CRUD뿐만 아니라, 회원가입, 로그인, 친구 추가, 프로필 수정, 그리고 회원 탈퇴와 같이 여러 서비스와 리포지토리를 아우르는 복잡한 로직을 모두 처리합니다.
 package com.chat.webflux.user;
 
 import com.chat.webflux.chatroom.ChatRoomRepository;
@@ -23,24 +24,24 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class UserService {
-
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final ChatRoomRepository chatRoomRepository;
-    private final ChatRoomService chatRoomService;
-    private final UnreadCountRepository unreadCountRepository;
-    private final PresenceService presenceService;
-
+    // [의존성 주입]
+    private final UserRepository userRepository;// 유저 DB
+    private final PasswordEncoder passwordEncoder;// 비밀번호 암호화기
+    private final ChatRoomRepository chatRoomRepository;// 채팅방 DB
+    private final ChatRoomService chatRoomService;// 채팅방 서비스 로직
+    private final UnreadCountRepository unreadCountRepository;// 안 읽음 카운트 DB
+    private final PresenceService presenceService;// 실시간 접속 상태 서비스
+    // application.yml에 정의된 'file.upload-dir' 값을 주입받음
     @Value("${file.upload-dir}")
     private String uploadDir;
 
-    // signup 메서드에 nickname 파라미터 추가
+    // (POST) 회원가입 로직 (닉네임 파라미터 추가됨)
     public Mono<User> signup(String username, String password, String nickname) {
         // 닉네임이 비어있으면 아이디로 초기화
         final String finalNickname = (nickname == null || nickname.isBlank()) ? username : nickname;
-
+        // 2. DB에서 동일한 username이 있는지 확인
         return userRepository.findByUsername(username)
-                .flatMap(existingUser -> Mono.<User>error(new IllegalArgumentException("이미 사용 중인 아이디입니다.")))
+                .flatMap(existingUser -> Mono.<User>error(new IllegalArgumentException("SIGNUP_USERNAME_EXISTS")))
                 .switchIfEmpty(Mono.defer(() -> {
                     User user = new User();
                     user.setUsername(username);
@@ -49,25 +50,25 @@ public class UserService {
                     return userRepository.save(user);
                 }));
     }
-
+    // (POST) 로그인 로직
     public Mono<User> login(String username, String password) {
         return userRepository.findByUsername(username)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("사용자를 찾을 수 없습니다.")))
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("LOGIN_USER_NOT_FOUND")))
                 .flatMap(user -> {
                     if (passwordEncoder.matches(password, user.getPassword())) {
                         return Mono.just(user);
                     } else {
-                        return Mono.error(new IllegalArgumentException("비밀번호가 일치하지 않습니다."));
+                        return Mono.error(new IllegalArgumentException("LOGIN_INVALID_PASSWORD"));
                     }
                 });
     }
-
+    // (POST) 친구 추가 로직
     public Mono<User> addFriend(String currentUsername, String friendUsername) {
         if (currentUsername.equals(friendUsername)) {
-            return Mono.error(new IllegalArgumentException("자기 자신을 친구로 추가할 수 없습니다."));
+            return Mono.error(new IllegalArgumentException("FRIEND_ADD_SELF_ERROR"));
         }
         Mono<User> friendMono = userRepository.findByUsername(friendUsername)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("존재하지 않는 사용자입니다.")));
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("LOGIN_USER_NOT_FOUND")));
         Mono<User> currentUserMono = userRepository.findByUsername(currentUsername);
 
         return Mono.zip(currentUserMono, friendMono)
@@ -75,16 +76,49 @@ public class UserService {
                     User currentUser = tuple.getT1();
                     User friend = tuple.getT2();
                     if (currentUser.getFriendUsernames().contains(friend.getUsername())) {
-                        return Mono.error(new IllegalArgumentException("이미 추가된 친구입니다."));
+                        return Mono.error(new IllegalArgumentException("FRIEND_ALREADY_EXISTS_ERROR"));
                     }
                     currentUser.getFriendUsernames().add(friend.getUsername());
                     return userRepository.save(currentUser);
                 });
     }
 
+    public Mono<Void> deleteFriend(String currentUsername, String friendUsername) {
+        // 1. 사용자 본인과 삭제할 친구 정보를 DB에서 동시에 가져옴
+        Mono<User> currentUserMono = userRepository.findByUsername(currentUsername)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("LOGIN_USER_NOT_FOUND")));
+        Mono<User> friendUserMono = userRepository.findByUsername(friendUsername)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("FRIEND_DELETE_TARGET_NOT_FOUND")));
+
+        // 2. 두 사용자 정보가 모두 로딩되면 로직 실행
+        return Mono.zip(currentUserMono, friendUserMono)
+                .flatMap(tuple -> {
+                    User currentUser = tuple.getT1();
+                    User friendUser = tuple.getT2();
+
+                    // 3. 양쪽 사용자의 친구 목록에서 서로를 제거
+                    boolean removedFromCurrentUser = currentUser.getFriendUsernames().remove(friendUsername);
+                    boolean removedFromFriendUser = friendUser.getFriendUsernames().remove(currentUsername);
+
+                    // 4. 한쪽이라도 제거가 일어났으면 DB에 저장 (데이터 정합성)
+                    if (removedFromCurrentUser || removedFromFriendUser) {
+                        log.info("[FRIEND DELETE] '{}'님과 '{}'님의 친구 관계를 삭제합니다.", currentUsername, friendUsername);
+                        // 두 사용자 정보를 동시에 저장
+                        return userRepository.save(currentUser)
+                                .then(userRepository.save(friendUser))
+                                .then(); // Mono<Void> 반환
+                    } else {
+                        // 5. 양쪽 다 목록에 없었으면, 이미 삭제된 것으로 간주
+                        log.warn("[FRIEND DELETE] 삭제 실패: '{}'님과 '{}'님은 이미 친구가 아닙니다.", currentUsername, friendUsername);
+                        return Mono.empty(); // Mono<Void>
+                    }
+                });
+    }
+
+    // (GET) 내 친구 목록 조회
     public Flux<User> getFriends(String username) {
         return userRepository.findByUsername(username)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("사용자를 찾을 수 없습니다.")))
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("LOGIN_USER_NOT_FOUND")))
                 .flatMapMany(user -> {
                     if (user.getFriendUsernames() == null || user.getFriendUsernames().isEmpty()) {
                         return Flux.empty();
@@ -92,15 +126,15 @@ public class UserService {
                     return userRepository.findByUsernameIn(user.getFriendUsernames());
                 });
     }
-
+    // (GET) 단순 username으로 사용자 조회 (다른 서비스/컨트롤러에서 사용)
     public Mono<User> findByUsername(String username) {
         return userRepository.findByUsername(username)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("User not found")));
     }
-
+    // (POST) 프로필 수정 (닉네임 + 프로필 사진)
     public Mono<User> updateProfile(String currentUsername, String newNickname, Mono<FilePart> filePartMono) {
         return userRepository.findByUsername(currentUsername)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("사용자를 찾을 수 없습니다.")))
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("LOGIN_USER_NOT_FOUND")))
                 .flatMap(user -> {
                     Mono<User> userWithUpdatedImage = filePartMono
                             .flatMap(filePart -> {
@@ -108,7 +142,7 @@ public class UserService {
                                 try {
                                     Files.createDirectories(profileUploadPath);
                                 } catch (IOException e) {
-                                    return Mono.error(new RuntimeException("프로필 업로드 폴더를 생성할 수 없습니다.", e));
+                                    return Mono.error(new RuntimeException("PROFILE_UPLOAD_DIR_ERROR", e));
                                 }
                                 String originalFilename = filePart.filename();
                                 String extension = "";
@@ -132,9 +166,10 @@ public class UserService {
                     });
                 });
     }
+    // (DELETE) 회원 탈퇴 (여러 서비스를 사용하는 복잡한 트랜잭션)
     public Mono<Void> deleteUser(String username) {
         return userRepository.findByUsername(username)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("사용자를 찾을 수 없습니다.")))
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("LOGIN_USER_NOT_FOUND")))
                 .flatMap(user -> {
 
                     // 1. 이 유저가 속한 모든 채팅방에서 나가기

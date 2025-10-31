@@ -1239,16 +1239,16 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     width: 32px;
     height: 32px;
 }
-#personal-event-modal .modal-body {
+#room-event-modal .modal-body,#personal-event-modal .modal-body {
     padding: 15px 15px; /* 👈 상하 20px, 좌우 25px의 여백 추가 */
 }
-#personal-event-modal .form-group {
+#room-event-modal .form-group,#personal-event-modal .form-group {
     /* (기존 .form-group 스타일이 flex/column이라면 gap이 좋지만,
        없을 경우를 대비해 margin-bottom이 가장 안전합니다.)
     */
     margin-bottom: 10px; /* 👈 각 폼 그룹 아래에 16px 여백 */
 }
-#personal-event-modal .modal-buttons {
+#room-event-modal .modal-buttons,#personal-event-modal .modal-buttons {
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
@@ -1256,7 +1256,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     padding: 15px 25px;
     border-top: 1px solid #f0f0f0; /* 구분선 */
 }
-#personal-event-modal .modal-buttons button {
+#room-event-modal .modal-buttons,#personal-event-modal .modal-buttons button {
     width: auto;
 }
 .fc-prev-button .fc-icon,
@@ -1294,8 +1294,8 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     content: '\f054'; /* (오른쪽 꺾쇠 >) */
 }
 #room-calendar-view .fc-header-toolbar,#calendar-view .fc-header-toolbar {
-    padding-left: 10px;  /* 👈 왼쪽 여백 */
-    padding-right: 10px; /* 👈 오른쪽 여백 */
+    padding-left: 10px;
+    padding-right: 10px;
     align-items: center;
 }
 .fc-addEventButton-button {
@@ -1335,7 +1335,7 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
     box-shadow: none !important;
 
     /* 3. 아이콘 색상을 헤더 제목(검은색)과 통일 */
-    color: #333 !important; /* 👈 아이콘 색상을 어둡게 (흰색 -> 검은색) */
+    color: #333 !important;
 
     /* (선택) 버튼 모양 및 호버 효과 */
     border-radius: 5px;
@@ -1344,8 +1344,166 @@ input[type="text"], input[type="password"] { width: 100%; padding: 12px; border:
 
 /* 4. 마우스를 올리면 짙어지는 효과 */
 #room-calendar-view .fc-button,#calendar-view .fc-button:hover {
-    background-color: rgba(0, 0, 0, 0.1) !important; /* 👈 옅은 회색 배경 */
+    background-color: rgba(0, 0, 0, 0.1) !important;
 }
 #add-personal-event-button {
     display: none !important;
+}
+/* 토스트 컨테이너 (화면 우측 상단에 고정) */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column; /* 알림이 세로로 쌓이도록 */
+    gap: 10px;
+}
+
+/*  개별 토스트 알림창 */
+.toast {
+    padding: 12px 18px;
+    border-radius: 8px;
+    color: white;
+    font-size: 15px;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.4s cubic-bezier(0.21, 1.02, 0.73, 1); /* 부드러운 애니메이션 */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/*  토스트 알림이 'show' 클래스를 가질 때 (나타날 때) */
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/*  알림 종류별 색상 */
+.toast.success {
+    background-color: #28a745; /* 성공 (초록색) */
+    /* background-color: var(--main-color); */ /* 메인 색상 사용도 가능 */
+}
+
+.toast.error {
+    background-color: #dc3545; /* 실패 (빨간색) */
+}
+#choice-modal .modal-body {
+    padding: 20px 25px;
+}
+
+#choice-description {
+    font-size: 16px;
+    line-height: 1.6;
+    white-space: pre-wrap; /* \n (줄바꿈)을 인식함 */
+    margin: 0;
+}
+
+#choice-modal .modal-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 15px 25px;
+    border-top: 1px solid #f0f0f0;
+}
+
+#choice-modal .modal-buttons button {
+    width: auto;
+    font-size: 14px;
+    padding-left: 14px;
+    padding-right: 14px;
+}
+
+#choice-modal .modal-buttons .button-danger {
+    background-color: #dc3545;
+    color: white;
+}
+#choice-modal .modal-buttons .button-danger:hover {
+    background-color: #c82333;
+}
+#choice-modal .close-button {
+    background: none;
+    border: none;
+    font-size: 28px; /* 'x' 아이콘 크기 */
+    font-weight: bold;
+    color: #888;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+}
+#choice-modal .close-button:hover {
+    color: #333;
+}
+
+/* --- 친구 프로필 모달 스타일 --- */
+
+/* 0. (선택) 친구 목록의 '정보' 영역에만 클릭 커서 표시 */
+.friend-list-item .friend-info {
+    cursor: pointer;
+}
+
+/* 1. 모달 body (프로필 사진과 이름이 들어갈 영역) */
+#friend-profile-modal .friend-profile-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 25px 25px 15px 25px;
+}
+
+/* 2. 프로필 사진 (원형) */
+.friend-profile-pic {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #f0f0f0;
+    margin-bottom: 15px;
+}
+
+/* 3. 이름 텍스트 */
+#friend-profile-name {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* 4. 하단 버튼 영역 (DM, 삭제 버튼) */
+#friend-profile-modal .friend-profile-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 15px 25px 20px 25px;
+    border-top: 1px solid #f0f0f0;
+}
+#friend-profile-modal .friend-profile-buttons button {
+    width: auto;
+    font-size: 14px;
+    padding: 10px 16px;
+}
+
+#choice-overlay {
+    z-index: 1001;
+}
+
+/*  [설명 텍스트] "이 메시지를..." 부분에 좌우 여백 추가 */
+#announce-confirm-modal .modal-body {
+    padding-left: 25px;
+    padding-right: 25px;
+}
+
+/*  [버튼 영역] 가로 정렬(flex)로 변경 */
+#announce-confirm-modal .modal-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 15px 25px;
+    border-top: 1px solid #f0f0f0;
+}
+
+/*  [버튼] 너비를 'auto'로 설정 */
+#announce-confirm-modal .modal-buttons button {
+    width: auto;
+    margin: 0;
 }
