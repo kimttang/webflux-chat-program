@@ -31,12 +31,15 @@ public class ChatRoom {
     private Set<String> members = new HashSet<>();
     private String announcement;
 
+    private boolean isDm;
+
     // 그룹 채팅방 생성을 위한 생성자
     public ChatRoom(String name, String createdBy) {
         this.name = name;
         this.createdBy = createdBy;
         this.createdAt = Instant.now();
         this.members.add(createdBy);
+        this.isDm = false;
     }
 
     // 1:1 채팅방(DM) 생성을 위한 생성자
@@ -47,5 +50,6 @@ public class ChatRoom {
         this.createdAt = Instant.now();
         this.members.add(fromUser);
         this.members.add(toUser);
+        this.isDm = true;
     }
 }

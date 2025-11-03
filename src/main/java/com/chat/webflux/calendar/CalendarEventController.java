@@ -183,7 +183,7 @@ public class CalendarEventController {
         } catch (Exception e) {
             // 3. 날짜 형식이 잘못된 경우 400 Bad Request 오류 반환
             return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "잘못된 날짜 형식입니다. UTC (YYYY-MM-DDTHH:mm:ssZ) 형식이 필요합니다.", e));
+                    "CALENDAR_INVALID_DATE_FORMAT_ERROR", e));
         }
 
         // 4. "공용" 일정 정보 설정

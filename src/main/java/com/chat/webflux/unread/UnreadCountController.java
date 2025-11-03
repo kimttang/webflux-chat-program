@@ -9,24 +9,26 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-@Slf4j // [5. @Slf4j 어노테이션 추가]
+//이 컨트롤러는 **"안 읽은 메시지 수"**와 관련된 API를 처리합니다.
+@Slf4j
 @RestController
 @RequestMapping("/api/unread")
 @RequiredArgsConstructor
 public class UnreadCountController {
-
+    // 안 읽음 카운트 관련 DB 로직을 처리하는 서비스
     private final UnreadCountService unreadCountService;
+    //  안 읽은 수를 리셋한 후, 채팅방 목록 SSE 스트림에 갱신 알림을 보내는 서비스
     private final ChatRoomService chatRoomService; // [6. ChatRoomService 의존성 주입]
-
+    // (GET) 특정 사용자의 "모든" 안 읽음 카운트 정보를 조회 (예: 로그인 시 초기 데이터 로드용)
     @GetMapping("/{userId}")
     public Flux<UnreadCount> getUnreadCounts(@PathVariable String userId) {
         return unreadCountService.getUnreadCounts(userId);
     }
 
-    // [7. resetUnreadCount 메서드를 통째로 덮어쓰기]
+    // (POST) 특정 채팅방의 안 읽은 카운트를 0으로 "리셋"(사용자가 방에 입장하여 메시지를 읽었을 때 프론트엔드에서 호출됨)
     @PostMapping("/reset")
     public Mono<Void> resetUnreadCount(@RequestBody UnreadCount unreadCount) {
-
+        // 1. 요청 본문(JSON)에서 userId와 roomId를 추출
         String userId = unreadCount.getUserId();
         String roomId = unreadCount.getRoomId();
 

@@ -25,6 +25,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -64,28 +65,58 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     @Override
     public Mono<Void> handle(WebSocketSession session) {
         // 1. (유저 코드) roomId, username 추출
-        // (getRoomId, getUsernameFromUri 헬퍼 메서드가 있다고 가정)
         String roomId = getRoomId(session);
         String username = getUsernameFromUri(session);
-
-        // [!] 세션 ID를 키로 사용합니다.
         String sessionId = session.getId();
 
+        // 2. [수정] findById를 시도하고, .switchIfEmpty()로 "없을 경우"의 로직을 추가
         return chatRoomRepository.findById(roomId)
-                .flatMap(chatRoom -> {
-                    // 2. (유저 코드) 보안 검사 (매우 좋은 로직입니다)
+                .switchIfEmpty(Mono.defer(() -> {
+                    // 3. [신규] 방이 없을 때, ID에 '-'가 포함되어 있으면 "새 DM방"으로 간주
+                    if (roomId.contains("-") && !username.isBlank()) {
+                        log.info("새 1:1 DM방을 생성합니다: {}", roomId);
+
+                        // 4. [신규] ID에서 두 유저의 이름을 파싱 (예: "userA-userB")
+                        String[] users = roomId.split("-");
+                        if (users.length != 2) {
+                            return Mono.error(new IllegalArgumentException("잘못된 DM방 ID 형식입니다."));
+                        }
+                        String user1 = users[0];
+                        String user2 = users[1];
+
+                        // 5. [신규] 두 유저의 닉네임을 DB에서 찾아 "닉네임A & 닉네임B" 형식으로 조합
+                        // (UserRepository가 이 클래스에 주입되어 있습니다)
+                        Mono<User> userMono1 = userRepository.findByUsername(user1);
+                        Mono<User> userMono2 = userRepository.findByUsername(user2);
+
+                        return Mono.zip(userMono1, userMono2)
+                                .flatMap(tuple -> {
+                                    String name = tuple.getT1().getNickname() + " & " + tuple.getT2().getNickname();
+                                    String fromUser = username; // 현재 접속 시도 중인 유저
+                                    String toUser = username.equals(user1) ? user2 : user1; // 상대방 유저
+
+                                    // 6. [신규] 'isDm = true'로 설정하는 DM 생성자 호출!
+                                    ChatRoom newDmRoom = new ChatRoom(roomId, name, fromUser, toUser);
+
+                                    // 7. [신규] DB에 저장
+                                    return chatRoomRepository.save(newDmRoom);
+                                });
+                    } else {
+                        // 그룹방이거나 username이 없으면 에러
+                        return Mono.error(new SecurityException("존재하지 않는 채팅방입니다."));
+                    }
+                }))
+                .flatMap(chatRoom -> { // <--- .flatMap(chatRoom -> ...)은 여기서부터 시작
+                    // 8. (기존 로직) 보안 검사
                     if (!chatRoom.getMembers().contains(username)) {
                         log.warn("Unauthorized WebSocket connection attempt by user {} to room {}", username, roomId);
                         return Mono.error(new SecurityException("Unauthorized"));
                     }
 
-                    // [ 3. 세션 추가: 'roomSessions' 변수와 'sessionId'를 키로 사용 (충돌 수정)]
+                    // 9. (기존 로직) 세션 추가, 접속 알림 등...
                     roomSessions.computeIfAbsent(roomId, k -> new ConcurrentHashMap<>()).put(sessionId, session);
-
                     presenceService.userOnline(username);
-
                     Mono<Void> resetDbMono = unreadCountService.resetUnreadCount(username, roomId);
-
                     Mono<Void> broadcastSseMono = Mono.fromRunnable(() -> {
                                 try {
                                     chatRoomService.broadcastRoomListToUser(username);
@@ -96,27 +127,23 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                             .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
                             .then();
 
-                    // 6. (유저 코드) 메시지 수신 로직
+                    // 10. (기존 로직) 메시지 수신 시작
                     return resetDbMono
-                            .then(broadcastSseMono) // DB 리셋 -> SSE 방송이 끝난 후
-                            .then( // 메시지 수신 시작
+                            .then(broadcastSseMono)
+                            .then(
                                     session.receive()
-                                            // (handleMessage 헬퍼 메서드가 있다고 가정)
                                             .flatMap(message -> handleMessage(session, message.getPayloadAsText()))
                                             .doOnError(e -> log.error("Error in WebSocket handling for room {}: {}", roomId, e.getMessage()))
                                             .doFinally(signalType -> {
-
-                                                // [7. 세션 제거: 'roomSessions' 변수와 'sessionId'를 키로 사용 (충돌 수정)]
+                                                // 11. (기존 로직) 세션 제거
                                                 Map<String, WebSocketSession> sessionsInRoom = roomSessions.get(roomId);
                                                 if (sessionsInRoom != null) {
-                                                    sessionsInRoom.remove(sessionId); // ID로 세션 제거
+                                                    sessionsInRoom.remove(sessionId);
                                                     if (sessionsInRoom.isEmpty()) {
-                                                        roomSessions.remove(roomId); // 방이 비면 방 자체를 제거
+                                                        roomSessions.remove(roomId);
                                                         log.info("[WS Room Empty] Room {} is now empty.", roomId);
                                                     }
                                                 }
-
-                                                //  'isUserPresentInAnyRoom' 헬퍼가 'roomSessions'를 보도록 수정 필요
                                                 if (!isUserPresentInAnyRoom(username)) {
                                                     presenceService.userOffline(username);
                                                 }
@@ -299,8 +326,6 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         // 1. 봇 이름, API URL, 모델 설정
         final String BOT_USERNAME = "바브봇";
         final int MESSAGE_LIMIT = 50;
-        final String OLLAMA_API_URL = "http://localhost:11434/api/chat";
-        final String OLLAMA_MODEL = "gemma3:4b"; // (기존 translateMessage에서 사용하는 모델)
 
         // 2. 채팅방 정보 및 최근 메시지를 가져옵니다.
         Mono<ChatRoom> roomMono = chatRoomRepository.findById(roomId);
@@ -346,9 +371,10 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                     String prompt = "다음은 채팅 대화 내용입니다. 이 대화의 핵심 내용을 3줄 이내로 간결하게 요약해주세요.\n\n[대화 내용]\n" + conversationContext;
 
                     // 6. Ollama API 호출
-                    OllamaRequest ollamaRequest = new OllamaRequest(OLLAMA_MODEL, List.of(new OllamaMessage("user", prompt)), false);
+                    OllamaRequest ollamaRequest = new OllamaRequest(ollamaModel, List.of(new OllamaMessage("user", prompt)), false);
+                    String finalApiUrl = ollamaBaseUrl.endsWith("/api/chat") ? ollamaBaseUrl : ollamaBaseUrl + "/api/chat";
 
-                    return webClient.post().uri(OLLAMA_API_URL).bodyValue(ollamaRequest)
+                    return webClient.post().uri(finalApiUrl).bodyValue(ollamaRequest)
                             .retrieve()
                             .bodyToMono(OllamaResponse.class)
                             .flatMap(ollamaResponse -> {
@@ -517,11 +543,11 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     }
 
     public void broadcastMessage(String roomId, OutgoingMessage outgoingMessage, WebSocketSession exclude) {
-        Set<WebSocketSession> roomSessions = sessions.get(roomId);
-        if (roomSessions != null) {
+        Map<String, WebSocketSession> sessionsInRoom = roomSessions.get(roomId); // ⬅️ [수정]
+        if (sessionsInRoom != null) {
             try {
                 String messageStr = objectMapper.writeValueAsString(outgoingMessage);
-                roomSessions.stream()
+                sessionsInRoom.values().stream()
                         .filter(s -> s.isOpen() && (exclude == null || !s.getId().equals(exclude.getId())))
                         .forEach(s -> s.send(Mono.just(s.textMessage(messageStr))).subscribe());
             } catch (IOException e) {
@@ -542,13 +568,15 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     }
 
     public boolean isUserPresent(String roomId, String username) {
-        Set<WebSocketSession> roomSessions = sessions.get(roomId);
+        Map<String, WebSocketSession> sessionsInRoom = roomSessions.get(roomId);
         if (roomSessions == null) return false;
-        return roomSessions.stream().anyMatch(s -> username.equals(getUsernameFromUri(s)));
+        return sessionsInRoom.values().stream().anyMatch(s -> username.equals(getUsernameFromUri(s)));
     }
 
     private boolean isUserPresentInAnyRoom(String username) {
-        return sessions.values().stream().flatMap(Set::stream).anyMatch(s -> username.equals(getUsernameFromUri(s)));
+        return roomSessions.values().stream() // Map<String, WebSocketSession>
+                .flatMap(sessionsInRoom -> sessionsInRoom.values().stream()) // WebSocketSession
+                .anyMatch(s -> username.equals(getUsernameFromUri(s)));
     }
 
     private String getRoomId(WebSocketSession session) {
@@ -585,9 +613,6 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     // !일정 명령어를 처리하는 함수 (AI 연동)
     private Mono<Void> processScheduleCommand(String commandText, String roomId) {
 
-        final String OLLAMA_API_URL = "http://localhost:11434/api/chat";
-        final String OLLAMA_MODEL = "gemma3:4b";
-
         // ollama가 제목에 날짜를 빼도록 프롬프트 수정
         String prompt = String.format(
                 "Today's date is %s. The user's timezone is KST (UTC+9). " +
@@ -602,9 +627,10 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 commandText
         );
 
-        OllamaRequest ollamaRequest = new OllamaRequest(OLLAMA_MODEL, List.of(new OllamaMessage("user", prompt)), false);
+        OllamaRequest ollamaRequest = new OllamaRequest(ollamaModel, List.of(new OllamaMessage("user", prompt)), false);
+        String finalApiUrl = ollamaBaseUrl.endsWith("/api/chat") ? ollamaBaseUrl : ollamaBaseUrl + "/api/chat";
 
-        return webClient.post().uri(OLLAMA_API_URL)
+        return webClient.post().uri(finalApiUrl)
                 .bodyValue(ollamaRequest)
                 .retrieve()
                 .bodyToMono(OllamaResponse.class)

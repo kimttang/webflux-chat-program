@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+//친구 관계 (친구 추가, 목록 조회) API 요청을 처리하는 컨트롤러
 @RestController
 @RequestMapping("/api/friends")
 @RequiredArgsConstructor
@@ -17,6 +18,7 @@ public class FriendController {
 
     private final UserService userService;
 
+    //"친구 추가" 요청 시 프론트엔드가 보낼 JSON 본문을 매핑하기 위한 DTO
     @Getter
     @Setter
     private static class FriendRequest {
