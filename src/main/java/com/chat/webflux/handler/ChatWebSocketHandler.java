@@ -378,33 +378,56 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                             .retrieve()
                             .bodyToMono(OllamaResponse.class)
                             .flatMap(ollamaResponse -> {
-                                // 7. Ollama의 응답(요약)을 '바브봇'이 보낸 새 메시지로 생성
-                                String summaryContent = extractTranslatedText(ollamaResponse.getMessage().getContent());
-                                ChatMessage botMessage = new ChatMessage(roomId, BOT_USERNAME, summaryContent);
-                                botMessage.getReadBy().add(BOT_USERNAME); // 봇은 스스로 읽음 처리
+                                // 7. Ollama 응답과 봇 메시지 "내용"을 2개로 분리
+                                final String titleContent = "다음은 채팅 대화 요약입니다.";
+                                final String summaryContent = ollamaResponse.getMessage().getContent(); // (이전 단계에서 수정한 내용)
 
-                                // 8. 봇 메시지를 DB에 저장
-                                return chatMessageRepository.save(botMessage)
-                                        .flatMap(savedMessage ->
-                                                // 9. 봇 유저 정보를 찾아서 DTO 생성 (DB에 봇 유저가 없을 것을 대비)
+                                // 8. [메시지 1: "제목" 전송]
+                                ChatMessage titleMessage = new ChatMessage(roomId, BOT_USERNAME, titleContent);
+                                titleMessage.getReadBy().add(BOT_USERNAME);
+
+                                // "제목" 메시지를 저장하고 DTO로 변환하는 Mono
+                                Mono<ChatMessageDto> saveAndBroadcastTitle = chatMessageRepository.save(titleMessage)
+                                        .flatMap(savedTitleMsg ->
                                                 userRepository.findByUsername(BOT_USERNAME)
-                                                        .map(user -> new ChatMessageDto(savedMessage, user))
-                                                        .defaultIfEmpty(new ChatMessageDto(savedMessage, BOT_USERNAME)) // 비상용 DTO 생성
-                                                        .flatMap(chatMessageDto -> {
-                                                            // 10. 봇 메시지를 브로드캐스트
-                                                            broadcastMessage(roomId, OutgoingMessage.forChatMessage(chatMessageDto));
+                                                        .map(user -> new ChatMessageDto(savedTitleMsg, user))
+                                                        .defaultIfEmpty(new ChatMessageDto(savedTitleMsg, BOT_USERNAME)) // 비상용
+                                        ).doOnNext(dto -> {
+                                            // DTO가 준비되면 "제목" 메시지를 브로드캐스트 (doOnNext로 사이드 이펙트 처리)
+                                            broadcastMessage(roomId, OutgoingMessage.forChatMessage(dto));
+                                        });
 
-                                                            // [수정] Error 4, 5: 'chatRoom' 대신 'room' 변수 사용
-                                                            room.getMembers().forEach(member -> {
-                                                                if (!member.equals(BOT_USERNAME) && !isUserPresent(roomId, member)) {
-                                                                    unreadCountService.incrementUnreadCount(member, roomId).subscribe();
-                                                                }
-                                                            });
-                                                            chatRoomService.broadcastToAllMembers(room);
 
-                                                            return Mono.empty();
-                                                        })
-                                        ).then();
+                                // 9. [메시지 2: "본문" 전송] - 1번(제목)이 성공한 "후에"(.then) 실행
+                                Mono<Void> saveAndBroadcastSummary = Mono.defer(() -> { // defer로 지연 실행
+                                    ChatMessage summaryMessage = new ChatMessage(roomId, BOT_USERNAME, summaryContent);
+                                    summaryMessage.getReadBy().add(BOT_USERNAME);
+
+                                    // "본문" 메시지를 저장하고 DTO로 변환
+                                    return chatMessageRepository.save(summaryMessage)
+                                            .flatMap(savedSummaryMsg ->
+                                                    userRepository.findByUsername(BOT_USERNAME)
+                                                            .map(user -> new ChatMessageDto(savedSummaryMsg, user))
+                                                            .defaultIfEmpty(new ChatMessageDto(savedSummaryMsg, BOT_USERNAME)) // 비상용
+                                                            .flatMap(chatMessageDto -> {
+                                                                // 10. 봇 메시지 (본문) 브로드캐스트
+                                                                broadcastMessage(roomId, OutgoingMessage.forChatMessage(chatMessageDto));
+
+                                                                // 11. [핵심] "마지막" 메시지이므로, 여기서 안 읽음 카운트 처리
+                                                                room.getMembers().forEach(member -> {
+                                                                    if (!member.equals(BOT_USERNAME) && !isUserPresent(roomId, member)) {
+                                                                        unreadCountService.incrementUnreadCount(member, roomId).subscribe();
+                                                                    }
+                                                                });
+                                                                chatRoomService.broadcastToAllMembers(room);
+
+                                                                return Mono.empty(); // 최종 Mono<Void> 반환
+                                                            })
+                                            ).then(); // Mono<Void>로 변환
+                                });
+
+                                // 12. 두 Mono를 순차적으로 실행: "제목" 전송 -> (성공하면) -> "본문" 전송
+                                return saveAndBroadcastTitle.then(saveAndBroadcastSummary);
                             });
                 })
                 .doOnError(e -> log.error("Error processing summary command: {}", e.getMessage(), e))
