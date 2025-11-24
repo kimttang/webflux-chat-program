@@ -122,6 +122,10 @@
                 <button id="leave-room-btn" class="text-danger">
                     <i class="fas fa-door-open"></i> <span data-translate-key="leaveButton">채팅방 나가기</span>
                 </button>
+                <button id="room-settings-btn">
+                    <i class="fas fa-language"></i> <span data-translate-key="menuTranslationSettings">통역 설정</span>
+                </button>
+                <hr class="popup-divider">
             </div>
         </div>
         <div id="announcement-bar" class="announcement-bar hidden">
@@ -161,7 +165,8 @@
                 <option id="lang-zh" value="zh" data-translate-key="langZh"></option>
                 <option id="lang-ar" value="ar" data-translate-key="langAr"></option>
             </select>
-            <input type="text" id="message-input" placeholder=""><button id="send-button"><i class="fas fa-paper-plane"></i></button>
+            <textarea id="message-input" placeholder="메시지를 입력하세요..." rows="1"></textarea>
+            <button id="send-button"><i class="fas fa-paper-plane"></i></button>
         </div>
     </div>
 </div>
@@ -350,6 +355,32 @@
             </button>
             <button id="friend-profile-delete-btn" class="button button-danger">
                 <i class="fas fa-user-times"></i> <span data-translate-key="btnFriendProfileDelete">친구 삭제</span>
+            </button>
+        </div>
+    </div>
+</div>
+<div id="room-settings-overlay" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 data-translate-key="settingsTitle">통역 언어 설정</h2>
+            <button id="close-settings-btn" class="close-button">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p data-translate-key="settingsDesc" style="margin-bottom: 15px; color: #666;">
+                이 채팅방에서 사용할 언어를 모두 선택하세요.<br>
+                (선택한 언어로 자동 번역되어 저장됩니다.)
+            </p>
+            <div class="checkbox-group" style="display: flex; flex-direction: column; gap: 10px;">
+                <label><input type="checkbox" value="ko"> 🇰🇷 한국어 (Korean)</label>
+                <label><input type="checkbox" value="en"> 🇺🇸 English</label>
+                <label><input type="checkbox" value="ja"> 🇯🇵 日本語 (Japanese)</label>
+                <label><input type="checkbox" value="zh"> 🇨🇳 中文 (Chinese)</label>
+                <label><input type="checkbox" value="ar"> 🇸🇦 العربية (Arabic)</label>
+            </div>
+        </div>
+        <div class="modal-buttons">
+            <button id="save-settings-btn" class="button">
+                <i class="fas fa-save"></i> <span data-translate-key="saveButton">저장</span>
             </button>
         </div>
     </div>

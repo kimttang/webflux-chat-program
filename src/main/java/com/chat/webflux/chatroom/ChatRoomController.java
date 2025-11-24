@@ -97,4 +97,22 @@ public class ChatRoomController {
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
+        // [신규 추가] 채팅방 통역 언어 설정을 위한 DTO (데이터 가방)
+        @Getter
+        @Setter
+        private static class UpdateLanguagesRequest {
+            private List<String> languages; // 예: ["ko", "en"]
+        }
+
+        // [신규 추가] (UPDATE) 채팅방 통역 언어 설정 저장 API
+        // 요청 주소: POST /api/chatrooms/{roomId}/languages
+        @PostMapping("/{roomId}/languages")
+        public Mono<ResponseEntity<Void>> updateRoomLanguages(
+                @PathVariable String roomId,
+                @RequestBody UpdateLanguagesRequest request) {
+
+            // 서비스에게 "이 방 언어 설정 좀 바꿔줘"라고 시킴
+            return chatRoomService.updateRoomLanguages(roomId, request.getLanguages())
+                    .thenReturn(ResponseEntity.ok().<Void>build());
+        }
 }

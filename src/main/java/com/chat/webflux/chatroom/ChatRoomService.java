@@ -316,5 +316,18 @@ public class ChatRoomService {
                 })
                 .doOnSuccess(this::broadcastToAllMembers); // 성공 시, 변경된 정보를 모든 멤버에게 실시간 전파
     }
-
+    // [신규 추가] 채팅방 통역 언어 목록 업데이트 로직
+    public Mono<ChatRoom> updateRoomLanguages(String roomId, List<String> languages) {
+        return chatRoomRepository.findById(roomId)
+                .flatMap(room -> {
+                    // 1. DB 데이터 수정
+                    room.setActiveLanguages(languages);
+                    return chatRoomRepository.save(room);
+                })
+                .doOnSuccess(updatedRoom -> {
+                    // 2. [중요] 채팅방에 있는 모든 사람에게 "설정 변경됨!" 알림 (실시간 동기화)
+                    // (기존에 있는 broadcastToAllMembers 메서드 재사용)
+                    this.broadcastToAllMembers(updatedRoom);
+                });
+    }
 }

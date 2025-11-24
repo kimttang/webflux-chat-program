@@ -32,10 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -245,40 +242,108 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 .then(broadcastSseMono);
     }
 
+    // [최종 수정] 기존 기능(요약, 일정) + AI 동시통역 기능 통합
     private Mono<Void> handleNewMessage(WebSocketSession session, IncomingMessage incomingMessage, String username, String roomId) {
         String content = incomingMessage.getMessage();
-        // [신규 로직] @바브봇 명령어 감지
 
+        // ----------------------------------------------------------------
+        // 1. [기존 유지] @바브봇 요약 명령어 처리
+        // ----------------------------------------------------------------
         if (content != null && content.startsWith("@바브봇")) {
             if (content.contains("요약") || content.contains("summarize")) {
-                // "요약" 명령어가 포함된 경우, 요약 핸들러로 처리를 넘깁니다.
-                return handleSummaryCommand(session, roomId, username); // [수정] session을 사용합니다.
+                return handleSummaryCommand(session, roomId, username);
             } else {
                 log.warn("Unknown AI Bot command received: {}", content);
-                return Mono.empty(); // 메시지 저장/전송 안 함
+                return Mono.empty();
             }
         }
 
-        // !일정 감지 시, "roomId"를 인자로 넘겨줌
+        // ----------------------------------------------------------------
+        // 2. [기존 유지] !일정 명령어 처리
+        // ----------------------------------------------------------------
         if (content != null && content.startsWith("!일정 ")) {
             String commandText = content.substring(4).trim();
-
-            //roomId를 함께 전달하도록 수정
             return processScheduleCommand(commandText, roomId);
         }
 
+        // ----------------------------------------------------------------
+        // 3. 기본 메시지 객체 생성
+        // ----------------------------------------------------------------
         ChatMessage chatMessage = new ChatMessage(roomId, username, content);
+        chatMessage.setReadBy(new HashSet<>(Set.of(username))); // 보낸 사람은 읽음 처리
+        chatMessage.setMessageType(ChatMessage.MessageType.TEXT);
+
         if (incomingMessage.getReplyToMessageId() != null && !incomingMessage.getReplyToMessageId().isEmpty()) {
             chatMessage.setReplyToMessageId(incomingMessage.getReplyToMessageId());
         }
 
+        // ----------------------------------------------------------------
+        // 4. [신규 추가] AI 동시통역 로직 (저장하기 전에 실행)
+        // ----------------------------------------------------------------
+        return chatRoomRepository.findById(roomId)
+                .flatMap(room -> {
+                    List<String> targets = room.getActiveLanguages();
+
+                    // (A) 통역 설정이 없으면 -> 바로 저장 (기존 로직으로 이동)
+                    if (targets == null || targets.isEmpty()) {
+                        return saveAndBroadcastMessage(chatMessage, incomingMessage, roomId, username);
+                    }
+
+                    // (B) 통역 설정이 있으면 -> AI에게 JSON 번역 요청
+                    String targetListStr = String.join(", ", targets);
+                    String prompt = String.format(
+                            "Translate the following text: \"%s\"\n" +
+                                    "Target languages: %s\n" +
+                                    "Return ONLY a JSON object where keys are language codes (e.g., 'ko', 'en') and values are translated texts.\n" +
+                                    "Example format: {\"ko\": \"안녕\", \"en\": \"Hello\"}\n" +
+                                    "Do NOT include markdown code blocks. Just raw JSON string.",
+                            content, targetListStr
+                    );
+
+                    OllamaRequest ollamaRequest = new OllamaRequest(ollamaModel, List.of(new OllamaMessage("user", prompt)), false);
+                    String finalApiUrl = ollamaBaseUrl.endsWith("/api/chat") ? ollamaBaseUrl : ollamaBaseUrl + "/api/chat";
+
+                    // AI 호출
+                    return webClient.post().uri(finalApiUrl).bodyValue(ollamaRequest)
+                            .retrieve()
+                            .bodyToMono(OllamaResponse.class)
+                            .map(res -> {
+                                // 응답에서 JSON 문자열 추출 및 정제
+                                String jsonResponse = res.getMessage().getContent();
+                                return jsonResponse.replaceAll("```json", "").replaceAll("```", "").trim();
+                            })
+                            .map(jsonStr -> {
+                                // JSON 파싱하여 chatMessage에 설정
+                                try {
+                                    Map<String, String> translationMap = objectMapper.readValue(jsonStr, Map.class);
+                                    chatMessage.setTranslations(translationMap);
+                                } catch (Exception e) {
+                                    log.error("AI 번역 JSON 파싱 실패: {}", e.getMessage());
+                                }
+                                return chatMessage;
+                            })
+                            .onErrorResume(e -> {
+                                log.error("AI 통역 API 호출 실패: {}", e.getMessage());
+                                return Mono.just(chatMessage); // 실패해도 원본은 보냄
+                            })
+                            // AI 처리가 끝난 메시지를 저장 및 전송
+                            .flatMap(msg -> saveAndBroadcastMessage(msg, incomingMessage, roomId, username));
+                });
+    }
+
+    // ----------------------------------------------------------------
+    // [도우미 메소드] 기존의 복잡한 저장 및 브로드캐스트 로직을 분리 (코드 중복 방지)
+    // ----------------------------------------------------------------
+    private Mono<Void> saveAndBroadcastMessage(ChatMessage chatMessage, IncomingMessage incomingMessage, String roomId, String username) {
         return chatMessageRepository.save(chatMessage)
                 .flatMap(savedMessage ->
                         userRepository.findByUsername(username)
-                                .flatMap(user -> createChatMessageDtoWithReplyInfo(savedMessage, user))
+                                .flatMap(user -> createChatMessageDtoWithReplyInfo(savedMessage, user)) // 기존 메소드 활용
                                 .flatMap(chatMessageDto -> {
+                                    // 1. 메시지 전송
                                     broadcastMessage(roomId, OutgoingMessage.forChatMessage(chatMessageDto));
 
+                                    // 2. 안 읽음 카운트 및 목록 갱신 (기존 로직 그대로)
                                     chatRoomRepository.findById(roomId).subscribe(chatRoom -> {
                                         chatRoom.getMembers().forEach(member -> {
                                             if (!member.equals(username) && !isUserPresent(roomId, member)) {
@@ -288,33 +353,30 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                                         chatRoomService.broadcastToAllMembers(chatRoom);
                                     });
 
+                                    // (참고) 기존의 단일 타겟 번역 로직은 '동시통역' 기능과 겹치므로,
+                                    // 동시통역이 동작했다면 굳이 실행할 필요 없지만 호환성을 위해 남겨둘 수 있습니다.
                                     if (incomingMessage.getTargetLang() != null && !incomingMessage.getTargetLang().isEmpty()) {
                                         translateMessage(savedMessage.getId(), incomingMessage.getMessage(), incomingMessage.getTargetLang(), username)
                                                 .subscribe();
                                     }
+
+                                    // 3. 안 읽음 카운트 DB 저장 및 SSE 갱신 (기존 로직 그대로)
                                     return chatRoomRepository.findById(roomId)
                                             .flatMap(chatRoom -> {
-
-                                                // "안 읽음 숫자 1 증가" 작업을 Mono<Void>로 정의
                                                 Mono<Void> incrementMono = Flux.fromIterable(chatRoom.getMembers())
-                                                        .filter(member -> !member.equals(username)) // 보낸 사람 제외
-                                                        .filter(member -> !isUserPresent(roomId, member))  // 채팅방에 없는 사람만
-                                                        .flatMap(member -> unreadCountService.incrementUnreadCount(member, roomId)) // (A) DB Write
-                                                        .then(); // <-- 모든 DB 저장이 끝날 때까지 기다림
+                                                        .filter(member -> !member.equals(username))
+                                                        .filter(member -> !isUserPresent(roomId, member))
+                                                        .flatMap(member -> unreadCountService.incrementUnreadCount(member, roomId))
+                                                        .then();
 
-                                                //  "안 읽음" 저장이 "모두" 완료된 "후에"(.then) SSE 갱신 실행
-                                                return incrementMono
-                                                        .then(Mono.fromRunnable(() -> {
-                                                            log.info("[SSE Broadcast] 텍스트 메시지로 인한 목록 갱신 (Room: {})", chatRoom.getId());
-                                                            // 이 시점엔 DB Write가 완료되었으므로, broadcast가 정확한 숫자를 읽음
-                                                            chatRoom.getMembers().forEach(chatRoomService::broadcastRoomListToUser);
-                                                        }));
+                                                return incrementMono.then(Mono.fromRunnable(() -> {
+                                                    log.info("[SSE Broadcast] 목록 갱신 (Room: {})", chatRoom.getId());
+                                                    chatRoom.getMembers().forEach(chatRoomService::broadcastRoomListToUser);
+                                                }));
                                             });
                                 })
                 )
-                .then(); // Mono<Void> 반환
-
-
+                .then();
     }
 
     /**
@@ -764,5 +826,28 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     private static class OllamaScheduleDto {
         private String title;
         private String start;
+    }
+    // [신규 추가] 메시지를 DB에 저장하고, 채팅방 멤버들에게 브로드캐스트하는 헬퍼 메소드
+    private Mono<Void> saveAndBroadcast(ChatMessage message, ChatRoom room) {
+        return chatMessageRepository.save(message)
+                .flatMap(savedMsg -> userRepository.findByUsername(message.getSender())
+                        .map(user -> new ChatMessageDto(savedMsg, user))
+                        .defaultIfEmpty(new ChatMessageDto(savedMsg, message.getSender())) // 유저 정보 없으면 비상용 DTO
+                        .flatMap(dto -> {
+                            // 1. 실시간 메시지 전송
+                            broadcastMessage(message.getRoomId(), OutgoingMessage.forChatMessage(dto));
+
+                            // 2. 안 읽음 카운트 증가
+                            room.getMembers().forEach(member -> {
+                                if (!member.equals(message.getSender()) && !isUserPresent(room.getId(), member)) {
+                                    unreadCountService.incrementUnreadCount(member, room.getId()).subscribe();
+                                }
+                            });
+
+                            // 3. 채팅방 목록(SSE) 갱신 알림
+                            chatRoomService.broadcastToAllMembers(room);
+
+                            return Mono.empty();
+                        }));
     }
 }

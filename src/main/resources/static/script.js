@@ -1479,6 +1479,7 @@ function sendMessage() {
 
     // 4. 입력창을 비우고, 답장 상태를 초기화합니다.
     DOM.messageInput.value = '';
+    messageInput.style.height = 'auto';``
     DOM.sendButton.classList.remove('visible');
     cancelReply(); // 답장 바를 숨기고 ID를 초기화하는 함수 호출
 
@@ -1632,7 +1633,20 @@ function displayMessage(msg, parentElement = DOM.chatWindow) {
         else {
             const textContent = document.createElement('div');
             textContent.className = 'message-text-content';
-            textContent.textContent = content;
+
+            // 1. 기본은 원본 메시지
+            let finalContent = content;
+
+            // 2. ★핵심★ 내 언어 설정(currentLanguage)에 맞는 번역본이 있으면 그걸로 교체!
+            if (msg.translations && msg.translations[currentLanguage]) {
+                finalContent = msg.translations[currentLanguage];
+
+                // (선택사항) 원본이 궁금하면 마우스 올렸을 때 보이게 툴팁 추가
+                textContent.title = `Original: ${content}`;
+            }
+
+            // 3. 화면에 표시
+            textContent.innerHTML = finalContent;
             messageBubble.appendChild(textContent);
         }
     }
@@ -3037,3 +3051,87 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+const messageInput = document.getElementById('message-input');
+
+// 1. 높이 자동 조절 함수
+function autoResize() {
+    messageInput.style.height = 'auto'; // 높이 초기화
+    messageInput.style.height = messageInput.scrollHeight + 'px'; // 내용만큼 늘리기
+}
+
+if (messageInput) {
+    // 2. 입력할 때마다 높이 조절 이벤트
+    messageInput.addEventListener('input', function() {
+        autoResize();
+
+        // (기존 타이핑 알림 로직 연결)
+        if (typeof sendTypingEvent === 'function' && websocket && websocket.readyState === WebSocket.OPEN) {
+            sendTypingEvent();
+        }
+    });
+
+    // 3. 엔터키(Enter) 처리
+    messageInput.addEventListener('keydown', function(e) {
+        // Shift + Enter는 줄바꿈, 그냥 Enter는 전송
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault(); // 줄바꿈 방지
+            document.getElementById('send-button').click(); // 전송 버튼 클릭
+        }
+    });
+}
+// ========================================================
+// [신규 추가] 5. 다국어 동시통역 설정 및 표시 로직
+// (script.js 맨 마지막에 붙여넣으세요)
+// ========================================================
+
+const roomSettingsOverlay = document.getElementById('room-settings-overlay');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+const saveSettingsBtn = document.getElementById('save-settings-btn');
+const roomSettingsBtn = document.getElementById('room-settings-btn');
+
+// 1. [통역 설정] 버튼 클릭 시 모달 열기
+if (roomSettingsBtn) {
+    roomSettingsBtn.addEventListener('click', () => {
+        // 메뉴 닫기
+        document.getElementById('header-menu-popup').classList.add('hidden');
+        // 모달 열기
+        roomSettingsOverlay.classList.remove('hidden');
+
+        // (선택) 현재 방의 설정을 불러와서 체크박스에 표시하면 좋겠지만,
+        // 지금은 간단하게 열릴 때마다 체크박스를 초기화하거나 그대로 둡니다.
+    });
+}
+
+// 2. [닫기] 버튼 클릭 시 모달 닫기
+if (closeSettingsBtn) {
+    closeSettingsBtn.addEventListener('click', () => {
+        roomSettingsOverlay.classList.add('hidden');
+    });
+}
+
+// 3. [저장] 버튼 클릭 시 서버로 설정 전송
+if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', () => {
+        // 체크된 언어 목록 가져오기
+        const checkboxes = document.querySelectorAll('#room-settings-overlay input[type="checkbox"]:checked');
+        const selectedLangs = Array.from(checkboxes).map(cb => cb.value);
+
+        if (!currentRoomId) return;
+
+        // 서버 API 호출 (언어 설정 저장)
+        fetch(`/api/chatrooms/${currentRoomId}/languages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ languages: selectedLangs })
+        })
+            .then(response => {
+                if (response.ok) {
+                    alert("통역 설정이 저장되었습니다. 이제부터 대화가 자동 번역됩니다!");
+                    roomSettingsOverlay.classList.add('hidden');
+                } else {
+                    alert("설정 저장 실패: " + response.status);
+                }
+            })
+            .catch(err => console.error("Error saving languages:", err));
+    });
+}
