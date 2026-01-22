@@ -1,70 +1,90 @@
-# 🌐 BabelBridge (AI-Enhanced Real-time Chat Platform)
+# 🌉 BABEL-BRIDGE (Real-time Translation Chat)
 
-> **Spring WebFlux의 비동기 처리 성능과 Python AI의 정교한 언어 처리를 결합한 하이브리드 채팅 플랫폼** > 실시간 대용량 트래픽 처리가 가능한 Reactive Architecture와 통계 기반/LLM 하이브리드 번역 엔진을 탑재했습니다.
+> **Spring WebFlux와 WebSocket 기반의 대용량 트래픽 처리를 고려한 실시간 번역 채팅 서비스**
 
----
+![Java](https://img.shields.io/badge/Java-17-007396?style=flat-square&logo=java&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=flat-square&logo=spring-boot&logoColor=white)
+![Spring WebFlux](https://img.shields.io/badge/Spring_WebFlux-Reactive-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![WebSocket](https://img.shields.io/badge/WebSocket-Realtime-000000?style=flat-square&logo=socket.io&logoColor=white)
+![Ollama](https://img.shields.io/badge/AI-Ollama-000000?style=flat-square&logo=openai&logoColor=white)
 
-## 📅 프로젝트 개요
-- **프로젝트명:** BabelBridge (바벨 브릿지)
-- **개발 기간:** 2025.9.1 ~ 2025.11.7
-- **팀원:** [김태현] (Full Stack & AI Engineering)
-- **주요 컨셉:** MSA(Microservices Architecture) 지향의 성장형 AI 채팅 서비스
-
-## 🛠️ Tech Stack (기술 스택)
-
-### Frontend
-<img src="https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white"> <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white"> <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black">
-
-### Backend (Main Server)
-<img src="https://img.shields.io/badge/Spring Boot 3-6DB33F?style=for-the-badge&logo=springboot&logoColor=white"> <img src="https://img.shields.io/badge/Spring WebFlux-6DB33F?style=for-the-badge&logo=spring&logoColor=white"> <img src="https://img.shields.io/badge/Java 17-007396?style=for-the-badge&logo=openjdk&logoColor=white"> <img src="https://img.shields.io/badge/WebSocket-000000?style=for-the-badge&logo=websocket&logoColor=white">
-
-### Database
-<img src="https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white">
-
-### AI & NLP Service (Sub Server)
-<img src="https://img.shields.io/badge/Python 3.10-3776AB?style=for-the-badge&logo=python&logoColor=white"> <img src="https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white"> <img src="https://img.shields.io/badge/Scikit--Learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white"> <img src="https://img.shields.io/badge/Konlpy-0052CC?style=for-the-badge&logo=ko-fi&logoColor=white"> <img src="https://img.shields.io/badge/Ollama (Gemma)-000000?style=for-the-badge&logo=ollama&logoColor=white">
+## 📖 Project Overview
+BABEL-BRIDGE는 기존의 블로킹 방식(Spring MVC)이 아닌, **Non-Blocking I/O 기반의 Spring WebFlux**를 사용하여 구축한 채팅 어플리케이션입니다. 
+단순한 채팅을 넘어, 다국어 사용자를 위한 **실시간 번역**, **AI 요약**, 그리고 **동시성 이슈 해결** 등 백엔드 코어 기술적 챌린지에 집중한 프로젝트입니다.
 
 ---
 
-## 🌟 Key Features (핵심 기능)
+## 🛠 Technical Challenges & Solutions (핵심 문제 해결)
+> 이 프로젝트에서 경험한 주요 기술적 이슈와 해결 과정입니다.
 
-### 1. ⚡ Reactive Chatting (WebFlux & Netty)
-- **기술:** `Spring WebFlux`, `Netty`, `WebSocket`, `Sinks.Many`
-- **기능:** 전통적인 Blocking I/O 대신 **Event-Loop 기반의 Non-Blocking I/O**를 적용하여, 적은 리소스로도 대규모 동시 접속 처리가 가능합니다.
-- **특징:** MongoDB의 **Reactive Driver**(`ReactiveMongoRepository`)를 사용하여 데이터베이스 입출력까지 완전한 비동기 파이프라인을 구축했습니다.
+### 1. N+1 문제 및 쿼리 최적화
+* **문제:** 채팅 목록 조회 시 연관된 유저 정보와 메시지 정보를 가져오는 과정에서 N+1 쿼리 발생으로 성능 저하.
+* **해결:** (이 부분에 사용하신 해결책을 적어주세요. 예: `Fetch Join` 사용 또는 `Batch Size` 설정, 혹은 Reactive Repository의 `zip` 연산 활용 등)
 
-### 2. 🧠 Hybrid AI 번역 엔진 (Strict Mode)
-- **기술:** `KoNLPy (Okt)`, `Dice Score Algorithm`, `Ollama (Gemma 3:4b)`
-- **기능:** 단순 번역이 아닌, **학습된 데이터(`sentences.csv`)에 기반한 통계적 검증**을 수행합니다.
-- **로직:** 1. 사용자 입력 문장을 형태소 단위로 분해 및 정규화(NFC).
-  2. 학습 데이터와의 **Dice Coefficient(유사도 점수)** 계산.
-  3. 모르는 단어가 포함된 경우 **번역 거부(Strict Mode)**하여 비즈니스 오역(Hallucination)을 원천 차단.
+### 2. 동시성 제어 (Race Condition)
+* **문제:** 다수의 유저가 동시에 같은 채팅방의 '읽음 카운트'를 갱신할 때 데이터 불일치 발생.
+* **해결:** 데이터 무결성을 보장하기 위해 (예: `Optimistic Locking(낙관적 락)` 적용 또는 `Redis`를 활용한 Atomic 연산 처리) 방식을 도입하여 해결.
 
-### 3. 📚 사내 규정 RAG 검색 시스템
-- **기술:** `TF-IDF Vectorizer`, `Cosine Similarity`, `Python Flask`
-- **기능:** "연차 규정 알려줘"와 같은 자연어 질문 시, 사내 문서 데이터(`company_docs.csv`)에서 가장 유사한 규정을 검색하여 답변합니다.
-- **특징:** 키워드 매칭과 벡터 유사도 검색을 결합한 **하이브리드 검색 알고리즘**을 직접 구현했습니다.
+### 3. 실시간 '읽음' 동기화 (SSE & WebSocket)
+* **구현:** 채팅방 내부에서는 `WebSocket`을 사용하지만, 채팅방 밖(로비)에 있는 유저에게도 실시간으로 '안 읽음 배지'를 갱신해줘야 함.
+* **해결:** `Server-Sent Events(SSE)`를 도입하여, 채팅방에 입장하지 않은 상태에서도 리소스 소모를 최소화하며 실시간 알림을 전송하도록 아키텍처 분리.
 
-### 4. 🔗 Polyglot MSA Architecture
-- **기술:** `WebClient`, `REST API`
-- **구조:** - **Java Server:** 인증, 채팅 세션 관리, DB 저장 담당.
-  - **Python Server:** 고연산이 필요한 NLP 분석 및 AI 추론 담당.
-  - 두 서버는 `WebClient`를 통해 **Non-Blocking 방식**으로 통신하여 전체 시스템의 성능 저하를 방지했습니다.
+### 4. 글로벌 시간대(Timezone) 처리
+* **문제:** 서버 시간과 클라이언트(해외 유저)의 시간 차이로 메시지 타임스탬프 오류 발생.
+* **해결:** 서버에는 `UTC` 기준으로 저장하고, 클라이언트 전송 시 브라우저의 로케일 정보를 감지하여 '현지 시간'으로 자동 변환하여 렌더링.
 
 ---
 
-## 📐 System Architecture (시스템 구조)
+## ✨ Key Features
 
-graph LR
-    User["User (Browser)"] -- "WebSocket (ws://)" --> Main["Main Server (Spring WebFlux)"]
-    
-    subgraph "Backend Core (Java)"
-    Main -- "Reactive Stream" --> DB[("MongoDB")]
-    end
-    
-    subgraph "AI Engine (Python)"
-    Main -- "REST API (Async)" --> Python["AI Server (Flask)"]
-    Python -- "NLP Analysis" --> CSV1["Trans Data"]
-    Python -- "RAG Search" --> CSV2["Company Docs"]
-    Python -- "Inference" --> LLM["Ollama (Gemma)"]
-    end
+### 💬 Chat System
+* **WebSocket 기반 실시간 채팅:** 1:1 DM 및 그룹 채팅 지원
+* **메시지 기능:** 답장, 수정, 삭제, **실시간 읽음 확인(안 읽은 사람 수 표시)**
+* **스마트 스크롤:** 채팅방 재입장 시 마지막으로 읽은 위치로 자동 스크롤
+
+### 🤖 AI Integration (Ollama)
+* **AI 채팅 요약:** 긴 대화 내용을 AI가 자동으로 요약
+* **스마트 일정 관리:** 대화 중 `!일정` 명령어 사용 시 내용을 분석하여 캘린더에 자동 등록
+
+### 📂 Utility
+* **미디어 전송:** 이미지 및 파일 업로드 지원
+* **실시간 알림:** SSE 기반의 로비 내 안 읽음 배지 카운트 실시간 갱신
+
+---
+
+## 📸 Screenshots
+
+<details>
+<summary><b>👀 스크린샷 펼쳐보기 (Click)</b></summary>
+<br>
+
+![BABEL_BRIDGE](https://github.com/user-attachments/assets/4b54ceb1-4cd6-4f5b-ad6d-5af15b1d2592)
+
+### Main Features
+| 채팅 메인 | 기능 예시 | 기능 예시 | 기능 예시 |
+|:---:|:---:|:---:|:---:|
+| ![1](https://github.com/user-attachments/assets/27660441-5df7-45e0-b51a-08df028a2dc0) | ![2](https://github.com/user-attachments/assets/9cee299d-5f12-4b8c-bc64-f0834c3d1037) | ![3](https://github.com/user-attachments/assets/c8e58810-7893-45e1-85bb-694fc32c3459) | ![4](https://github.com/user-attachments/assets/7c544c2c-32b4-42b5-95e2-7eedf2f8e8a8) |
+
+| 기능 예시 | 기능 예시 | 기능 예시 | 기능 예시 |
+|:---:|:---:|:---:|:---:|
+| ![5](https://github.com/user-attachments/assets/47716968-3edc-4933-9a16-1d3cf2d9dd72) | ![6](https://github.com/user-attachments/assets/950b6986-76f4-4702-aaef-8aa15c4bfa33) | ![7](https://github.com/user-attachments/assets/c1d255ca-3004-4089-811a-a68c8437e7ad) | ![8](https://github.com/user-attachments/assets/b0b95bb1-73cf-4e5b-a686-4149e81687c9) |
+
+### AI & Others
+| AI 기능 | 설정 | 기타 |
+|:---:|:---:|:---:|
+| ![9](https://github.com/user-attachments/assets/26517b65-e0ae-4668-b76f-bbb5f3c8793d) | ![10](https://github.com/user-attachments/assets/ff7ed12b-d949-4f6e-94bf-265514d42072) | ![13](https://github.com/user-attachments/assets/aec102ad-a6d3-4128-88e0-eee4777b3ad2) |
+
+![11](https://github.com/user-attachments/assets/eff62ee3-0799-4f81-a098-ec20acc32180) 
+![12](https://github.com/user-attachments/assets/035b151c-ebe4-4496-9b78-30e33f164dae)
+![14](https://github.com/user-attachments/assets/63c872a7-89d0-4396-8c1c-3b7865c960ba)
+
+</details>
+
+---
+
+## 🚀 Getting Started
+
+```bash
+git clone [https://github.com/kimttang/webflux-chat-program.git](https://github.com/kimttang/webflux-chat-program.git)
+cd webflux-chat-program
+./gradlew build
