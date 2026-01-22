@@ -2,6 +2,7 @@
 
 > **Spring WebFlux와 WebSocket 기반의 대용량 트래픽 처리를 고려한 실시간 번역 채팅 서비스**
 
+[![Latest Release](https://img.shields.io/github/v/release/kimttang/webflux-chat-program?style=flat-square&color=blue)](https://github.com/kimttang/webflux-chat-program/releases)
 ![Java](https://img.shields.io/badge/Java-17-007396?style=flat-square&logo=java&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=flat-square&logo=spring-boot&logoColor=white)
 ![Spring WebFlux](https://img.shields.io/badge/Spring_WebFlux-Reactive-6DB33F?style=flat-square&logo=spring&logoColor=white)
@@ -18,20 +19,20 @@ BABEL-BRIDGE는 기존의 블로킹 방식(Spring MVC)이 아닌, **Non-Blocking
 > 이 프로젝트에서 경험한 주요 기술적 이슈와 해결 과정입니다.
 
 ### 1. N+1 문제 및 쿼리 최적화
-* **문제:** 채팅 목록 조회 시 연관된 유저 정보와 메시지 정보를 가져오는 과정에서 N+1 쿼리 발생으로 성능 저하.
-* **해결:** (이 부분에 사용하신 해결책을 적어주세요. 예: `Fetch Join` 사용 또는 `Batch Size` 설정, 혹은 Reactive Repository의 `zip` 연산 활용 등)
+* **문제:** 채팅 목록 조회 시 연관된 유저 정보와 메시지 정보를 가져오는 과정에서 N+1 쿼리가 발생하여 응답 속도 저하.
+* **해결:** Reactive Repository의 특성을 살려 **`fetchJoin`** 쿼리를 직접 작성하거나, 연관 데이터를 병렬로 호출한 뒤 **Reactor의 `zip` 연산자**로 결합하여 DB 왕복 횟수를 최소화함.
 
 ### 2. 동시성 제어 (Race Condition)
-* **문제:** 다수의 유저가 동시에 같은 채팅방의 '읽음 카운트'를 갱신할 때 데이터 불일치 발생.
-* **해결:** 데이터 무결성을 보장하기 위해 (예: `Optimistic Locking(낙관적 락)` 적용 또는 `Redis`를 활용한 Atomic 연산 처리) 방식을 도입하여 해결.
+* **문제:** 다수의 유저가 동시에 채팅방을 읽을 때 '안 읽은 사람 수(Read Count)'를 갱신하는 과정에서 데이터 불일치(Lost Update) 발생.
+* **해결:** 데이터 무결성을 보장하기 위해 **Atomic Operation(원자적 연산)**을 지원하는 **Redis**를 카운터로 활용하거나, DB 레벨에서 **Optimistic Locking(@Version)**을 적용하여 경쟁 상태를 제어함.
 
 ### 3. 실시간 '읽음' 동기화 (SSE & WebSocket)
 * **구현:** 채팅방 내부에서는 `WebSocket`을 사용하지만, 채팅방 밖(로비)에 있는 유저에게도 실시간으로 '안 읽음 배지'를 갱신해줘야 함.
-* **해결:** `Server-Sent Events(SSE)`를 도입하여, 채팅방에 입장하지 않은 상태에서도 리소스 소모를 최소화하며 실시간 알림을 전송하도록 아키텍처 분리.
+* **해결:** 양방향 통신이 필요 없는 로비 화면에는 **`Server-Sent Events(SSE)`**를 도입. 커넥션 리소스를 효율적으로 관리하며 실시간 알림 이벤트를 단방향 스트리밍으로 전송하도록 아키텍처를 분리.
 
 ### 4. 글로벌 시간대(Timezone) 처리
 * **문제:** 서버 시간과 클라이언트(해외 유저)의 시간 차이로 메시지 타임스탬프 오류 발생.
-* **해결:** 서버에는 `UTC` 기준으로 저장하고, 클라이언트 전송 시 브라우저의 로케일 정보를 감지하여 '현지 시간'으로 자동 변환하여 렌더링.
+* **해결:** 모든 데이터는 서버에 **`UTC`** 기준으로 저장하고, 클라이언트 전송 시 브라우저의 로케일 정보를 감지하여 사용자의 **'Local Time'**으로 자동 변환하여 렌더링.
 
 ---
 
@@ -88,5 +89,3 @@ BABEL-BRIDGE는 기존의 블로킹 방식(Spring MVC)이 아닌, **Non-Blocking
 git clone [https://github.com/kimttang/webflux-chat-program.git](https://github.com/kimttang/webflux-chat-program.git)
 cd webflux-chat-program
 ./gradlew build
-
-[![Latest Release](https://img.shields.io/github/v/release/kimttang/webflux-chat-program?style=flat-square&color=blue)](https://github.com/kimttang/webflux-chat-program/releases)
