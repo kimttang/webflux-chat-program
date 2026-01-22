@@ -88,3 +88,5 @@ BABEL-BRIDGE는 기존의 블로킹 방식(Spring MVC)이 아닌, **Non-Blocking
 git clone [https://github.com/kimttang/webflux-chat-program.git](https://github.com/kimttang/webflux-chat-program.git)
 cd webflux-chat-program
 ./gradlew build
+
+[![Latest Release](https://img.shields.io/github/v/release/kimttang/webflux-chat-program?style=flat-square&color=blue)](https://github.com/kimttang/webflux-chat-program/releases)
